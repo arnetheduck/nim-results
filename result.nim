@@ -213,7 +213,12 @@ proc `==`[E, T](lhs, rhs: Result[E, T]): bool =
 proc `[]`*[T, E](self: Result[T, E]): T =
   ## Fetch value of result if set, or raise error as an Exception
   if self.isErr:
-    var e: ref ResultError; new (e)
+    var e: ref ResultError
+    when compiles($e.error):
+      # Set exception message, iff we can convert error to a string
+      new (e, $e.error)
+    else:
+      new (e)
     raise e
   self.value
 

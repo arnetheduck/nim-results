@@ -1,5 +1,5 @@
 type
-  Result*[T, E = string] = object
+  Result*[T, E] = object
     ## Result type that can hold either a value or an error, but not both
     ##
     ## # Example
@@ -7,7 +7,7 @@ type
     ## ```
     ## # It's convenient to create an alias - most likely, you'll do just fine
     ## # with strings as error!
-    ## type R = Result[int]
+    ## type R = Result[int, string]
     ##
     ## # Once you have a type, use `ok` and `err`:
     ## R.ok(42)
@@ -111,27 +111,27 @@ type
   # https://github.com/nim-lang/Nim/issues/7845
   ResultError = object of Exception
 
-# TODO check that r is a Result
-proc ok*(r: typedesc, v: auto): r =
+proc ok*(r: typedesc[Result],  v: auto): r =
   ## Initialize a result with a success and value
-  ## Example: `Result[int].ok(42)`
+  ## Example: `Result[int, string].ok(42)`
   r(isOk: true, value: v)
-proc ok*[T, E](self: var Result[T, E], v: auto) =
+
+proc ok*(self: var Result, v: auto) =
   ## Set the result to success and update value
   ## Example: `result.ok(42)`
-  self = Result[T, E].ok(v)
+  self = Result.ok(v)
 
-proc err*(r: typedesc, e: auto): r =
+proc err*(r: typedesc[Result], e: auto): r =
   ## Initialize the result to an error
-  ## Example: `Result[int].err("uh-oh")`
+  ## Example: `Result[int, string].err("uh-oh")`
   r(isOk: false, error: e)
 
-proc err*[T, E](self: var Result[T, E], v: auto) =
+proc err*(self: var Result, v: auto) =
   ## Set the result as an error
   ## Example: `result.err("uh-oh")`
-  self = Result[T, E].err(v)
+  self = Result.err(v)
 
-template isErr*[T, E](self: Result[T, E]): bool = not self.isOk
+template isErr*(self: Result): bool = not self.isOk
 
 proc map*[T, E, A](self: Result[T, E], f: proc(x: T): A {.closure.}): Result[A, E] =
   ## Transform value using f, or return error
@@ -155,7 +155,7 @@ proc mapCast*[T0, E0](self: Result[T0, E0], T1: typedesc): Result[T1, E0] =
   if self.isOk: result.ok(cast[T1](self.value))
   else: result.err(self.error)
 
-template `and`*[T, E](self: Result[T, E], other: untyped): untyped =
+template `and`*(self: Result, other: untyped): untyped =
   ## Evaluate `other` iff self.isOk, else return error
   ## fail-fast - will not evaluate other if a is an error
   if self.isOk:
@@ -164,22 +164,11 @@ template `and`*[T, E](self: Result[T, E], other: untyped): untyped =
     type R = type(other)
     R.err(self.error)
 
-template `or`*[T, E](self: Result[T, E], other: untyped): untyped =
+template `or`*(self: Result, other: untyped): untyped =
   ## Evaluate `other` iff not self.isOk, else return self
   ## fail-fast - will not evaluate other if a is a value
   if self.isOk: self
   else: other
-
-template `+`*[T, E](self, other: Result[T, E]): untyped =
-  ## Perform `+` on the values of self and other, if both are
-  type R = type(other)
-  if self.isOk:
-    if other.isOk:
-      R.ok(self.value + other.value)
-    else:
-      R.err(other.error)
-  else:
-    R.err(self.error)
 
 template catch*(body: typed): Result[type(body), ref Exception] =
   ## Convert a try expression into a Result
@@ -204,13 +193,13 @@ template capture*(a: typedesc, e: ref Exception): Result[a, ref Exception] =
     ret = R.err(getCurrentException())
   ret
 
-proc `==`[E, T](lhs, rhs: Result[E, T]): bool =
+proc `==`(lhs, rhs: Result): bool =
   if lhs.isOk != rhs.isOk: return false
   if lhs.isOk: return lhs.value == rhs.value
 
   return lhs.error == rhs.error
 
-proc `[]`*[T, E](self: Result[T, E]): T =
+proc `[]`*(self: Result): auto =
   ## Fetch value of result if set, or raise error as an Exception
   if self.isErr:
     var e: ref ResultError
@@ -228,7 +217,7 @@ proc `[]`*[T](self: Result[T, ref Exception]): T =
     raise self.error
   self.value
 
-proc `$`*[T, E](self: Result[T, E]): string =
+proc `$`*(self: Result): string =
   ## Returns string representation of `self`
   if self.isOk: "Ok(" & $self.value & ")"
   else: "Err(" & $self.error & ")"
@@ -239,13 +228,8 @@ template derefOr[T, E](self: Result[T, E], def: T): T =
   if self.isErr: def
   else: self.value
 
-iterator items[T, E](self: Result[T, E]): T =
-  ## Iterate over result as if it were a collection of either 0 or 1 items
-  if self.isOk:
-    yield self.value
-
 when isMainModule:
-  type R = Result[int]
+  type R = Result[int, string]
 
   # Basic usage, producer
   proc works(): R =
@@ -311,9 +295,6 @@ when isMainModule:
   doAssert (fails() == fails2())
   doAssert (works() != fails())
 
-  # Simple lifting..
-  doAssert (a + a)[] == a.value + a.value
-
   var counter = 0
   proc incCounter(): R =
     counter += 1
@@ -321,13 +302,6 @@ when isMainModule:
 
   doAssert (b and incCounter()).isErr, "b fails"
   doAssert counter == 0, "should fail fast on b"
-
-  # Iteration
-  var counter2 = 0
-  for v in a:
-    counter2 += 1
-
-  doAssert counter2 == 1, "one-item collection when set"
 
   # Mapping
   doAssert (a.map(proc(x: int): string = $x)[] == $a.value)
@@ -350,3 +324,82 @@ when isMainModule:
 
   doAssert a.mapConvert(int64)[] == int64(42)
   doAssert a.mapCast(int8)[] == int8(42)
+
+  # TODO there's a bunch of operators that one could lift through magic - this
+  #      is mainly an example
+  template `+`*(self, other: Result): untyped =
+    ## Perform `+` on the values of self and other, if both are ok
+    type R = type(other)
+    if self.isOk:
+      if other.isOk:
+        R.ok(self.value + other.value)
+      else:
+        R.err(other.error)
+    else:
+      R.err(self.error)
+
+  # Simple lifting..
+  doAssert (a + a)[] == a.value + a.value
+
+  iterator items[T, E](self: Result[T, E]): T =
+    ## Iterate over result as if it were a collection of either 0 or 1 items
+    ## TODO should a Result[seq[X]] iterate over items in seq? there are
+    ##      arguments for and against
+    if self.isOk:
+      yield self.value
+
+  # Iteration
+  var counter2 = 0
+  for v in a:
+    counter2 += 1
+
+  doAssert counter2 == 1, "one-item collection when set"
+
+  # Technically, it's possible to make a template that fetches type from
+  # result - whether this is a good idea is up for discussion:
+  template ok(v: untyped) {.dirty.} =
+    result.ok(v)
+    return
+
+  proc testOk(): Result[int, string] =
+    ok 42
+
+  doAssert testOk()[] == 42
+
+  # It's also possible to use the same trick for stack capture:
+  template capture*(): untyped =
+    type R = type(result)
+
+    var ret: R
+    try:
+      # TODO is this needed? I think so, in order to grab a call stack, but
+      #      haven't actually tested...
+      if true:
+        # I'm sure there's a nicer way - this just works :)
+        raise newException(Exception, "")
+    except:
+      ret = R.err(getCurrentException())
+    ret
+
+  proc testCapture(): Result[int, ref Exception] =
+    return capture()
+
+  doAssert testCapture().isErr
+
+  template `?`[T, E](self: Result[T, E]): T =
+    ## Early return - if self is an error, we will return from the current
+    ## function, else we'll move on..
+    if self.isErr: return self
+
+    self.value
+
+  proc testQn(): Result[int, string] =
+    let x = ?works() - ?works()
+    result.ok(x)
+
+  proc testQn2(): Result[int, string] =
+    # looks like we can even use it creatively like this
+    if ?fails() == 42: raise newException(Exception, "shouldn't happen")
+
+  doAssert testQn()[] == 0
+  doAssert testQn2().isErr

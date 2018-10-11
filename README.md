@@ -3,7 +3,8 @@
 Result type that can hold either a value or an error, but not both
 
 ## Example
-```
+
+```nim
 # It's convenient to create an alias - most likely, you'll do just fine
 # with strings as error!
 type R = Result[int, string]
@@ -16,7 +17,7 @@ R.err("bad luck")
 type
   Error = enum
     a, b, c
- type RE[T] = Result[T, Error]
+  type RE[T] = Result[T, Error]
 ```
 
 See result.nim for more in-depth documentation!

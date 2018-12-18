@@ -2,9 +2,21 @@
 
 Result type that can hold either a value or an error, but not both
 
+## Usage
+
+Add the following to your `.nimble` file:
+
+```
+requires "result"
+```
+
+or just drop the file in your project!
+
 ## Example
 
 ```nim
+import result
+
 # It's convenient to create an alias - most likely, you'll do just fine
 # with strings as error!
 

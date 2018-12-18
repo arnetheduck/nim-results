@@ -7,17 +7,32 @@ type
     ## ```
     ## # It's convenient to create an alias - most likely, you'll do just fine
     ## # with strings as error!
+    ##
     ## type R = Result[int, string]
     ##
     ## # Once you have a type, use `ok` and `err`:
-    ## R.ok(42)
-    ## R.err("bad luck")
     ##
-    ## # In case you think your callers what to handle errors differently:
+    ## proc works(): R =
+    ##   # ok says it went... ok!
+    ##   R.ok 42
+    ## proc fails(): R =
+    ##   # or type it like this, to not repeat the type!
+    ##   result.err "bad luck"
+    ##
+    ## if (let w = works(); w.ok):
+    ##   echo w[], " or use value: ", w.value
+    ##
+    ## # In case you think your callers want to differentiate between errors:
     ## type
     ##   Error = enum
     ##     a, b, c
     ##   type RE[T] = Result[T, Error]
+    ##
+    ## # In the expriments corner, you'll find the following syntax for passing
+    ## # errors up the stack:
+    ## proc f(): R =
+    ##   let x = ?works() - ?fails()
+    ##   assert false, "will never reach"
     ##
     ## ```
     ##
@@ -28,8 +43,11 @@ type
     ## * Errors are a visible part of the API - when they change, so must the
     ##   calling code and compiler will point this out - nice!
     ## * Errors are a visible part of the API - your fellow programmer is
-    ##   reminded that things can go wrong
+    ##   reminded that things actually can go wrong
     ## * Jives well with Nim `discard`
+    ## * Jives well with the new Defect exception hierarchy, where defects
+    ##   are raised for unrecoverable errors and the rest of the API uses
+    ##   results
     ## * Error and value return have similar performance characteristics
     ## * Caller can choose to turn them into exceptions at low cost - flexible
     ##   for libraries!
@@ -45,6 +63,7 @@ type
     ## * There's no call stack captured by default (see also `catch` and
     ##   `capture`)
     ## * The extra branching may be more expensive for the non-error path
+    ##   (though this can be minimized with PGO)
     ##
     ## The API visibility issue of exceptions can also be solved with
     ## `{.raises.}` annotations - as of now, the compiler doesn't remind
@@ -389,9 +408,10 @@ when isMainModule:
   template `?`[T, E](self: Result[T, E]): T =
     ## Early return - if self is an error, we will return from the current
     ## function, else we'll move on..
-    if self.isErr: return self
+    let v = self
+    if v.isErr: return v
 
-    self.value
+    v.value
 
   proc testQn(): Result[int, string] =
     let x = ?works() - ?works()

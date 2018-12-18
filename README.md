@@ -7,20 +7,36 @@ Result type that can hold either a value or an error, but not both
 ```nim
 # It's convenient to create an alias - most likely, you'll do just fine
 # with strings as error!
+
 type R = Result[int, string]
 
 # Once you have a type, use `ok` and `err`:
-R.ok(42)
-R.err("bad luck")
 
-# In case you think your callers what to handle errors differently:
+proc works(): R =
+  # ok says it went... ok!
+  R.ok 42
+proc fails(): R =
+  # or type it like this, to not repeat the type!
+  result.err "bad luck"
+
+if (let w = works(); w.ok):
+  echo w[], " or use value: ", w.value
+
+# In case you think your callers want to differentiate between errors:
 type
   Error = enum
     a, b, c
   type RE[T] = Result[T, Error]
+
+# In the expriments corner, you'll find the following syntax for passing
+# errors up the stack:
+proc f(): R =
+  let x = ?works() - ?fails()
+  assert false, "will never reach"
 ```
 
-See result.nim for more in-depth documentation!
+See result.nim for more in-depth documentation - specially towards the end where
+there are plenty of examples!
 
 ## License
 

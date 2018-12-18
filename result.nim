@@ -213,10 +213,12 @@ template capture*(a: typedesc, e: ref Exception): Result[a, ref Exception] =
   ret
 
 proc `==`(lhs, rhs: Result): bool =
-  if lhs.isOk != rhs.isOk: return false
-  if lhs.isOk: return lhs.value == rhs.value
-
-  return lhs.error == rhs.error
+  if lhs.isOk != rhs.isOk:
+    false
+  elif lhs.isOk:
+    lhs.value == rhs.value
+  else:
+    lhs.error == rhs.error
 
 proc `[]`*(self: Result): auto =
   ## Fetch value of result if set, or raise error as an Exception
@@ -241,7 +243,7 @@ proc `$`*(self: Result): string =
   if self.isOk: "Ok(" & $self.value & ")"
   else: "Err(" & $self.error & ")"
 
-template derefOr[T, E](self: Result[T, E], def: T): T =
+template valueOr[T, E](self: Result[T, E], def: T): T =
   ## Fetch value of result if set, or supplied default
   ## default will not be evaluated iff value is set
   if self.isErr: def
@@ -306,8 +308,8 @@ when isMainModule:
   except:
     discard
 
-  doAssert a.derefOr(50) == a.value
-  doAssert b.derefOr(50) == 50
+  doAssert a.valueOr(50) == a.value
+  doAssert b.valueOr(50) == 50
 
   # Comparisons
   doAssert (works() == works2())

@@ -1,3 +1,9 @@
+# Copyright (c) 2019 Jacek Sieka
+# Licensed and distributed under either of
+#   * MIT license (license terms in the root directory or at http://opensource.org/licenses/MIT).
+#   * Apache v2 license (license terms in the root directory or at http://www.apache.org/licenses/LICENSE-2.0).
+# at your option. This file may not be copied, modified, or distributed except according to those terms.
+
 type
   Result*[T, E] = object
     ## Result type that can hold either a value or an error, but not both
@@ -243,7 +249,7 @@ proc `$`*(self: Result): string =
   if self.isOk: "Ok(" & $self.value & ")"
   else: "Err(" & $self.error & ")"
 
-template valueOr[T, E](self: Result[T, E], def: T): T =
+template valueOr*[T, E](self: Result[T, E], def: T): T =
   ## Fetch value of result if set, or supplied default
   ## default will not be evaluated iff value is set
   if self.isErr: def

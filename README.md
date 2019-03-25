@@ -52,4 +52,5 @@ there are plenty of examples!
 
 ## License
 
-MIT license, just like Nim
+MIT license, just like Nim, or Apache, if you prefer that
+

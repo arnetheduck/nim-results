@@ -25,7 +25,7 @@ type
     ##   # or type it like this, to not repeat the type!
     ##   result.err "bad luck"
     ##
-    ## if (let w = works(); w.ok):
+    ## if (let w = works(); w.isOk):
     ##   echo w[], " or use value: ", w.value
     ##
     ## # In case you think your callers want to differentiate between errors:

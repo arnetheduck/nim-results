@@ -136,45 +136,45 @@ type
   # https://github.com/nim-lang/Nim/issues/7845
   ResultError = object of Exception
 
-proc ok*(r: typedesc[Result],  v: auto): r =
+proc ok*(r: typedesc[Result],  v: auto): r  {.inline.} =
   ## Initialize a result with a success and value
   ## Example: `Result[int, string].ok(42)`
   r(isOk: true, value: v)
 
-proc ok*(self: var Result, v: auto) =
+proc ok*(self: var Result, v: auto) {.inline.} =
   ## Set the result to success and update value
   ## Example: `result.ok(42)`
   self = Result.ok(v)
 
-proc err*(r: typedesc[Result], e: auto): r =
+proc err*(r: typedesc[Result], e: auto): r  {.inline.} =
   ## Initialize the result to an error
   ## Example: `Result[int, string].err("uh-oh")`
   r(isOk: false, error: e)
 
-proc err*(self: var Result, v: auto) =
+proc err*(self: var Result, v: auto)  {.inline.} =
   ## Set the result as an error
   ## Example: `result.err("uh-oh")`
   self = Result.err(v)
 
 template isErr*(self: Result): bool = not self.isOk
 
-proc map*[T, E, A](self: Result[T, E], f: proc(x: T): A {.closure.}): Result[A, E] =
+proc map*[T, E, A](self: Result[T, E], f: proc(x: T): A {.closure.}): Result[A, E]  {.inline.} =
   ## Transform value using f, or return error
   if self.isOk: result.ok(f(self.value))
   else: result.err(self.error)
 
-proc mapErr*[T, E, A](self: Result[T, E], f: proc(x: E): A {.closure.}): Result[T, A] =
+proc mapErr*[T, E, A](self: Result[T, E], f: proc(x: E): A {.closure.}): Result[T, A] {.inline.} =
   ## Transform error using f, or return value
   if self.isOk: result.ok(self.value)
   else: result.err(f(self.error))
 
-proc mapConvert*[T0, E0](self: Result[T0, E0], T1: typedesc): Result[T1, E0] =
+proc mapConvert*[T0, E0](self: Result[T0, E0], T1: typedesc): Result[T1, E0] {.inline.} =
   ## Convert result value to A using an implicit conversion
   ## Would be nice if it was automatic...
   if self.isOk: result.ok(self.value)
   else: result.err(self.error)
 
-proc mapCast*[T0, E0](self: Result[T0, E0], T1: typedesc): Result[T1, E0] =
+proc mapCast*[T0, E0](self: Result[T0, E0], T1: typedesc): Result[T1, E0] {.inline.} =
   ## Convert result value to A using a cast
   ## Would be nice with nicer syntax...
   if self.isOk: result.ok(cast[T1](self.value))
@@ -218,7 +218,7 @@ template capture*(a: typedesc, e: ref Exception): Result[a, ref Exception] =
     ret = R.err(getCurrentException())
   ret
 
-proc `==`(lhs, rhs: Result): bool =
+proc `==`(lhs, rhs: Result): bool  {.inline.} =
   if lhs.isOk != rhs.isOk:
     false
   elif lhs.isOk:
@@ -226,7 +226,7 @@ proc `==`(lhs, rhs: Result): bool =
   else:
     lhs.error == rhs.error
 
-proc `[]`*(self: Result): auto =
+proc `[]`*(self: Result): auto {.inline.} =
   ## Fetch value of result if set, or raise error as an Exception
   if self.isErr:
     var e: ref ResultError
@@ -238,7 +238,7 @@ proc `[]`*(self: Result): auto =
     raise e
   self.value
 
-proc `[]`*[T](self: Result[T, ref Exception]): T =
+proc `[]`*[T](self: Result[T, ref Exception]): T  {.inline.} =
   ## Fetch value of result if set, or raise the contained exception
   if self.isErr:
     raise self.error

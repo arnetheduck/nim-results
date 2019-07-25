@@ -5,6 +5,11 @@
 # at your option. This file may not be copied, modified, or distributed except according to those terms.
 
 type
+  # TODO ValueError is a Defect - is that what we want here really? It's what
+  #      Option does though..
+  ResultError[E] = ref object of ValueError
+    error: E
+
   Result*[T, E] = object
     ## Result type that can hold either a value or an error, but not both
     ##
@@ -40,7 +45,18 @@ type
     ##   let x = ?works() - ?fails()
     ##   assert false, "will never reach"
     ##
+    ## # If you provide this exception converter, this exception will be raised
+    ## # on dereference
+    ## func toException(v: Error): ref CatchableException = (ref CatchableException)(msg: $v)
+    ## try:
+    ##   RE[int].err(a)[]
+    ## except CatchableException:
+    ##   echo "in here!"
+    ##
     ## ```
+    ##
+    ## See the tests for more practical examples, specially when working with
+    ## back and forth with the exception world!
     ##
     ## # Potential benefits:
     ##
@@ -128,53 +144,58 @@ type
 
     case isOk*: bool
     of false:
-      error*: E
+      error: E
     of true:
-      value*: T
+      value: T
 
-  # TODO cannot raise generic error, so cannot include error value :(
-  # https://github.com/nim-lang/Nim/issues/7845
-  ResultError = object of Exception
-
-proc ok*(r: typedesc[Result],  v: auto): r  {.inline.} =
+proc ok*(R: type Result, v: auto): R {.inline.} =
   ## Initialize a result with a success and value
   ## Example: `Result[int, string].ok(42)`
-  r(isOk: true, value: v)
+  R(isOk: true, value: v)
 
 proc ok*(self: var Result, v: auto) {.inline.} =
   ## Set the result to success and update value
   ## Example: `result.ok(42)`
   self = Result.ok(v)
 
-proc err*(r: typedesc[Result], e: auto): r  {.inline.} =
+proc err*(R: type Result, e: auto): R {.inline.} =
   ## Initialize the result to an error
   ## Example: `Result[int, string].err("uh-oh")`
-  r(isOk: false, error: e)
+  R(isOk: false, error: e)
 
-proc err*(self: var Result, v: auto)  {.inline.} =
+proc err*(self: var Result, v: auto) {.inline.} =
   ## Set the result as an error
   ## Example: `result.err("uh-oh")`
   self = Result.err(v)
 
 template isErr*(self: Result): bool = not self.isOk
 
-proc map*[T, E, A](self: Result[T, E], f: proc(x: T): A {.closure.}): Result[A, E]  {.inline.} =
+proc map*[T, E, A](
+    self: Result[T, E], f: proc(x: T): A): Result[A, E] {.inline.} =
   ## Transform value using f, or return error
   if self.isOk: result.ok(f(self.value))
   else: result.err(self.error)
 
-proc mapErr*[T, E, A](self: Result[T, E], f: proc(x: E): A {.closure.}): Result[T, A] {.inline.} =
+proc flatMap*[T, E, A](
+    self: Result[T, E], f: proc(x: T): Result[A, E]): Result[A, E] {.inline.} =
+  if self.isOk: f(self.value)
+  else: Result[A, E].err(self.error)
+
+proc mapErr*[T, E, A](
+    self: Result[T, E], f: proc(x: E): A): Result[T, A] {.inline.} =
   ## Transform error using f, or return value
   if self.isOk: result.ok(self.value)
   else: result.err(f(self.error))
 
-proc mapConvert*[T0, E0](self: Result[T0, E0], T1: typedesc): Result[T1, E0] {.inline.} =
+proc mapConvert*[T0, E0](
+    self: Result[T0, E0], T1: type): Result[T1, E0] {.inline.} =
   ## Convert result value to A using an implicit conversion
   ## Would be nice if it was automatic...
   if self.isOk: result.ok(self.value)
   else: result.err(self.error)
 
-proc mapCast*[T0, E0](self: Result[T0, E0], T1: typedesc): Result[T1, E0] {.inline.} =
+proc mapCast*[T0, E0](
+    self: Result[T0, E0], T1: type): Result[T1, E0] {.inline.} =
   ## Convert result value to A using a cast
   ## Would be nice with nicer syntax...
   if self.isOk: result.ok(cast[T1](self.value))
@@ -204,8 +225,8 @@ template catch*(body: typed): Result[type(body), ref Exception] =
   except:
     R.err(getCurrentException())
 
-template capture*(a: typedesc, e: ref Exception): Result[a, ref Exception] =
-  type R = Result[a, ref Exception]
+template capture*(T: type, e: ref Exception): Result[T, ref Exception] =
+  type R = Result[T, ref Exception]
 
   var ret: R
   try:
@@ -218,7 +239,7 @@ template capture*(a: typedesc, e: ref Exception): Result[a, ref Exception] =
     ret = R.err(getCurrentException())
   ret
 
-proc `==`(lhs, rhs: Result): bool  {.inline.} =
+proc `==`(lhs, rhs: Result): bool {.inline.} =
   if lhs.isOk != rhs.isOk:
     false
   elif lhs.isOk:
@@ -226,22 +247,54 @@ proc `==`(lhs, rhs: Result): bool  {.inline.} =
   else:
     lhs.error == rhs.error
 
-proc `[]`*(self: Result): auto {.inline.} =
+template raiseResultError =
+  when E is ref Exception:
+    raise self.error
+  elif compiles(self.error.toException()):
+    raise self.error.toException()
+  elif compiles($self.error):
+    raise ResultError[E](
+      error: self.error, msg: "Trying to access value with err: " & $self.error)
+  else:
+    raise ResultError[E](error: self.error)
+
+proc `[]`*[T, E](self: Result[T, E]): T {.inline.} =
   ## Fetch value of result if set, or raise error as an Exception
-  if self.isErr:
-    var e: ref ResultError
-    when compiles($e.error):
-      # Set exception message, iff we can convert error to a string
-      new (e, $e.error)
-    else:
-      new (e)
-    raise e
+  if self.isErr: raiseResultError
+
   self.value
 
-proc `[]`*[T](self: Result[T, ref Exception]): T  {.inline.} =
-  ## Fetch value of result if set, or raise the contained exception
-  if self.isErr:
-    raise self.error
+proc `[]`*[T, E](self: var Result[T, E]): var T {.inline.} =
+  ## Fetch value of result if set, or raise error as an Exception
+  if self.isErr: raiseResultError
+
+  self.value
+
+template unsafeGet*[T, E](self: Result[T, E]): T =
+  ## Fetch value of result if set, undefined behavior if unset
+  ## See also: Option.unsafeGet
+  assert not self.isErr
+
+  self.value
+
+proc get*[T, E](self: Result[T, E]): T {.inline.} =
+  ## Fetch value of result if set, or raise error as an Exception
+  ## See also: Option.get
+  if self.isErr: raiseResultError
+
+  self.value
+
+proc get*[T, E](self: Result[T, E], otherwise: T): T {.inline.} =
+  ## Fetch value of result if set, or raise error as an Exception
+  ## See also: Option.get
+  if self.isErr: otherwise
+  else: self.value
+
+proc get*[T, E](self: var Result[T, E]): var T {.inline.} =
+  ## Fetch value of result if set, or raise error as an Exception
+  ## See also: Option.get
+  if self.isErr: raiseResultError
+
   self.value
 
 proc `$`*(self: Result): string =
@@ -252,8 +305,7 @@ proc `$`*(self: Result): string =
 template valueOr*[T, E](self: Result[T, E], def: T): T =
   ## Fetch value of result if set, or supplied default
   ## default will not be evaluated iff value is set
-  if self.isErr: def
-  else: self.value
+  self.get(def)
 
 when isMainModule:
   type R = Result[int, string]
@@ -332,6 +384,8 @@ when isMainModule:
 
   # Mapping
   doAssert (a.map(proc(x: int): string = $x)[] == $a.value)
+  doAssert (a.flatMap(
+    proc(x: int): Result[string, string] = Result[string, string].ok($x))[] == $a.value)
   doAssert (b.mapErr(proc(x: string): string = x & "no!").error == (b.error & "no!"))
 
   # Exception interop
@@ -431,3 +485,22 @@ when isMainModule:
 
   doAssert testQn()[] == 0
   doAssert testQn2().isErr
+
+
+  type
+    AnEnum = enum
+      anEnumA
+      anEnumB
+    AnException = ref object of Exception
+      v: AnEnum
+
+  proc toException(v: AnEnum): AnException = AnException(v: v)
+
+  proc testToException(): int =
+    try:
+      var r = Result[int, AnEnum].err(anEnumA)
+      r[]
+    except AnException:
+      42
+
+  doAssert testToException() == 42

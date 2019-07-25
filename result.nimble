@@ -8,7 +8,7 @@ skipDirs      = @["benchmarks"]
 
 # Dependencies
 
-requires "nim >= 0.18.0"
+requires "nim >= 0.19.0"
 
 task test, "Runs the test suite":
   exec "nim c -r result"

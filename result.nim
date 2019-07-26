@@ -248,6 +248,7 @@ proc `==`(lhs, rhs: Result): bool {.inline.} =
     lhs.error == rhs.error
 
 template raiseResultError =
+  mixin toException
   when E is ref Exception:
     raise self.error
   elif compiles(self.error.toException()):

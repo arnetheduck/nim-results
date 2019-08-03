@@ -23,10 +23,10 @@ type
     ##
     ## # Once you have a type, use `ok` and `err`:
     ##
-    ## proc works(): R =
+    ## func works(): R =
     ##   # ok says it went... ok!
     ##   R.ok 42
-    ## proc fails(): R =
+    ## func fails(): R =
     ##   # or type it like this, to not repeat the type!
     ##   result.err "bad luck"
     ##
@@ -41,7 +41,7 @@ type
     ##
     ## # In the expriments corner, you'll find the following syntax for passing
     ## # errors up the stack:
-    ## proc f(): R =
+    ## func f(): R =
     ##   let x = ?works() - ?fails()
     ##   assert false, "will never reach"
     ##
@@ -80,7 +80,7 @@ type
     ##
     ## * Handling errors becomes explicit and mandatory - if you'd rather ignore
     ##   them or just pass them to some catch-all, this is noise
-    ## * When composing operations, value must be lifted before processing,
+    ## * When composing operations, value must be lifted before funcessing,
     ##   adding potential verbosity / noise (fancy macro, anyone?)
     ## * There's no call stack captured by default (see also `catch` and
     ##   `capture`)
@@ -93,7 +93,7 @@ type
     ##
     ## Many system languages make a distinction between errors you want to
     ## handle and those that are simply bugs or unrealistic to deal with..
-    ## handling the latter will often involve aborting or crashing the process -
+    ## handling the latter will often involve aborting or crashing the funcess -
     ## reliable systems like Erlang will try to relaunch it.
     ##
     ## On the flip side we have dynamic languages like python where there's
@@ -144,62 +144,62 @@ type
 
     case isOk*: bool
     of false:
-      error: E
+      e: E
     of true:
-      value: T
+      v: T
 
-proc ok*(R: type Result, v: auto): R {.inline.} =
+func ok*(R: type Result, v: auto): R {.inline.} =
   ## Initialize a result with a success and value
   ## Example: `Result[int, string].ok(42)`
-  R(isOk: true, value: v)
+  R(isOk: true, v: v)
 
-proc ok*(self: var Result, v: auto) {.inline.} =
+func ok*(self: var Result, v: auto) {.inline.} =
   ## Set the result to success and update value
   ## Example: `result.ok(42)`
   self = Result.ok(v)
 
-proc err*(R: type Result, e: auto): R {.inline.} =
+func err*(R: type Result, e: auto): R {.inline.} =
   ## Initialize the result to an error
   ## Example: `Result[int, string].err("uh-oh")`
-  R(isOk: false, error: e)
+  R(isOk: false, e: e)
 
-proc err*(self: var Result, v: auto) {.inline.} =
+func err*(self: var Result, v: auto) {.inline.} =
   ## Set the result as an error
   ## Example: `result.err("uh-oh")`
   self = Result.err(v)
 
 template isErr*(self: Result): bool = not self.isOk
 
-proc map*[T, E, A](
-    self: Result[T, E], f: proc(x: T): A): Result[A, E] {.inline.} =
+func map*[T, E, A](
+    self: Result[T, E], f: func(x: T): A): Result[A, E] {.inline.} =
   ## Transform value using f, or return error
-  if self.isOk: result.ok(f(self.value))
-  else: result.err(self.error)
+  if self.isOk: result.ok(f(self.v))
+  else: result.err(self.e)
 
-proc flatMap*[T, E, A](
-    self: Result[T, E], f: proc(x: T): Result[A, E]): Result[A, E] {.inline.} =
-  if self.isOk: f(self.value)
-  else: Result[A, E].err(self.error)
+func flatMap*[T, E, A](
+    self: Result[T, E], f: func(x: T): Result[A, E]): Result[A, E] {.inline.} =
+  if self.isOk: f(self.v)
+  else: Result[A, E].err(self.e)
 
-proc mapErr*[T, E, A](
-    self: Result[T, E], f: proc(x: E): A): Result[T, A] {.inline.} =
+func mapErr*[T, E, A](
+    self: Result[T, E], f: func(x: E): A): Result[T, A] {.inline.} =
   ## Transform error using f, or return value
-  if self.isOk: result.ok(self.value)
-  else: result.err(f(self.error))
+  if self.isOk: result.ok(self.v)
+  else: result.err(f(self.e))
 
-proc mapConvert*[T0, E0](
+func mapConvert*[T0, E0](
     self: Result[T0, E0], T1: type): Result[T1, E0] {.inline.} =
   ## Convert result value to A using an implicit conversion
   ## Would be nice if it was automatic...
-  if self.isOk: result.ok(self.value)
-  else: result.err(self.error)
+  if self.isOk: result.ok(self.v)
+  else: result.err(self.e)
 
-proc mapCast*[T0, E0](
+func mapCast*[T0, E0](
     self: Result[T0, E0], T1: type): Result[T1, E0] {.inline.} =
   ## Convert result value to A using a cast
   ## Would be nice with nicer syntax...
-  if self.isOk: result.ok(cast[T1](self.value))
-  else: result.err(self.error)
+  if self.isOk: result.ok(cast[T1](self.v))
+  else: result.err(self.e)
 
 template `and`*(self: Result, other: untyped): untyped =
   ## Evaluate `other` iff self.isOk, else return error
@@ -208,7 +208,7 @@ template `and`*(self: Result, other: untyped): untyped =
     other
   else:
     type R = type(other)
-    R.err(self.error)
+    R.err(self.e)
 
 template `or`*(self: Result, other: untyped): untyped =
   ## Evaluate `other` iff not self.isOk, else return self
@@ -239,69 +239,77 @@ template capture*(T: type, e: ref Exception): Result[T, ref Exception] =
     ret = R.err(getCurrentException())
   ret
 
-proc `==`(lhs, rhs: Result): bool {.inline.} =
+func `==`(lhs, rhs: Result): bool {.inline.} =
   if lhs.isOk != rhs.isOk:
     false
   elif lhs.isOk:
-    lhs.value == rhs.value
+    lhs.v == rhs.v
   else:
-    lhs.error == rhs.error
+    lhs.e == rhs.e
 
 template raiseResultError =
   mixin toException
   when E is ref Exception:
-    raise self.error
-  elif compiles(self.error.toException()):
-    raise self.error.toException()
-  elif compiles($self.error):
+    raise self.e
+  elif compiles(self.e.toException()):
+    raise self.e.toException()
+  elif compiles($self.e):
     raise ResultError[E](
-      error: self.error, msg: "Trying to access value with err: " & $self.error)
+      error: self.e, msg: "Trying to access value with err: " & $self.e)
   else:
-    raise ResultError[E](error: self.error)
+    raise ResultError[E](error: self.e)
 
-proc `[]`*[T, E](self: Result[T, E]): T {.inline.} =
+func `[]`*[T, E](self: Result[T, E]): T {.inline.} =
   ## Fetch value of result if set, or raise error as an Exception
   if self.isErr: raiseResultError
 
-  self.value
+  self.v
 
-proc `[]`*[T, E](self: var Result[T, E]): var T {.inline.} =
+func `[]`*[T, E](self: var Result[T, E]): var T {.inline.} =
   ## Fetch value of result if set, or raise error as an Exception
   if self.isErr: raiseResultError
 
-  self.value
+  self.v
 
 template unsafeGet*[T, E](self: Result[T, E]): T =
   ## Fetch value of result if set, undefined behavior if unset
   ## See also: Option.unsafeGet
   assert not self.isErr
 
-  self.value
+  self.v
 
-proc get*[T, E](self: Result[T, E]): T {.inline.} =
+func get*[T, E](self: Result[T, E]): T {.inline.} =
   ## Fetch value of result if set, or raise error as an Exception
   ## See also: Option.get
   if self.isErr: raiseResultError
 
-  self.value
+  self.v
 
-proc get*[T, E](self: Result[T, E], otherwise: T): T {.inline.} =
+func get*[T, E](self: Result[T, E], otherwise: T): T {.inline.} =
   ## Fetch value of result if set, or raise error as an Exception
   ## See also: Option.get
   if self.isErr: otherwise
-  else: self.value
+  else: self.v
 
-proc get*[T, E](self: var Result[T, E]): var T {.inline.} =
+func get*[T, E](self: var Result[T, E]): var T {.inline.} =
   ## Fetch value of result if set, or raise error as an Exception
   ## See also: Option.get
   if self.isErr: raiseResultError
 
-  self.value
+  self.v
 
-proc `$`*(self: Result): string =
+func `$`*(self: Result): string =
   ## Returns string representation of `self`
-  if self.isOk: "Ok(" & $self.value & ")"
-  else: "Err(" & $self.error & ")"
+  if self.isOk: "Ok(" & $self.v & ")"
+  else: "Err(" & $self.e & ")"
+
+func error*[T, E](self: Result[T, E]): E =
+  if self.isOk: raise ResultError[void](msg: "Result does not contain an error")
+
+  self.e
+
+template value*[T, E](self: Result[T, E]): T = self.get()
+template value*[T, E](self: var Result[T, E]): T = self.get()
 
 template valueOr*[T, E](self: Result[T, E], def: T): T =
   ## Fetch value of result if set, or supplied default
@@ -312,17 +320,17 @@ when isMainModule:
   type R = Result[int, string]
 
   # Basic usage, producer
-  proc works(): R =
+  func works(): R =
     R.ok(42)
-  proc fails(): R =
+  func fails(): R =
     R.err("dummy")
 
-  proc works2(): R =
+  func works2(): R =
     result.ok(42)
-  proc fails2(): R =
+  func fails2(): R =
     result.err("dummy")
 
-  proc raises(): int =
+  func raises(): int =
     raise newException(Exception, "hello")
 
   # Basic usage, consumer
@@ -331,7 +339,7 @@ when isMainModule:
     b = fails()
 
   doAssert a.isOk
-  doAssert a.value == 42
+  doAssert a.get() == 42
   doAssert (not a.isErr)
 
   # Combine
@@ -384,10 +392,10 @@ when isMainModule:
   doAssert counter == 0, "should fail fast on b"
 
   # Mapping
-  doAssert (a.map(proc(x: int): string = $x)[] == $a.value)
+  doAssert (a.map(func(x: int): string = $x)[] == $a.value)
   doAssert (a.flatMap(
     proc(x: int): Result[string, string] = Result[string, string].ok($x))[] == $a.value)
-  doAssert (b.mapErr(proc(x: string): string = x & "no!").error == (b.error & "no!"))
+  doAssert (b.mapErr(func(x: string): string = x & "no!").error == (b.error & "no!"))
 
   # Exception interop
   let e = capture(int, newException(Exception, "test"))
@@ -414,11 +422,11 @@ when isMainModule:
     type R = type(other)
     if self.isOk:
       if other.isOk:
-        R.ok(self.value + other.value)
+        R.ok(self.v + other.value)
       else:
         R.err(other.error)
     else:
-      R.err(self.error)
+      R.err(self.e)
 
   # Simple lifting..
   doAssert (a + a)[] == a.value + a.value
@@ -428,7 +436,7 @@ when isMainModule:
     ## TODO should a Result[seq[X]] iterate over items in seq? there are
     ##      arguments for and against
     if self.isOk:
-      yield self.value
+      yield self.v
 
   # Iteration
   var counter2 = 0
@@ -443,7 +451,7 @@ when isMainModule:
     result.ok(v)
     return
 
-  proc testOk(): Result[int, string] =
+  func testOk(): Result[int, string] =
     ok 42
 
   doAssert testOk()[] == 42
@@ -476,11 +484,11 @@ when isMainModule:
 
     v.value
 
-  proc testQn(): Result[int, string] =
+  func testQn(): Result[int, string] =
     let x = ?works() - ?works()
     result.ok(x)
 
-  proc testQn2(): Result[int, string] =
+  func testQn2(): Result[int, string] =
     # looks like we can even use it creatively like this
     if ?fails() == 42: raise newException(Exception, "shouldn't happen")
 
@@ -495,9 +503,9 @@ when isMainModule:
     AnException = ref object of Exception
       v: AnEnum
 
-  proc toException(v: AnEnum): AnException = AnException(v: v)
+  func toException(v: AnEnum): AnException = AnException(v: v)
 
-  proc testToException(): int =
+  func testToException(): int =
     try:
       var r = Result[int, AnEnum].err(anEnumA)
       r[]

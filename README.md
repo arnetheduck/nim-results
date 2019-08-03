@@ -32,7 +32,7 @@ proc fails(): R =
   result.err "bad luck"
 
 if (let w = works(); w.isOk):
-  echo w[], " or use value: ", w.value
+  echo w[], " or use get(): ", w.get()
 
 # In case you think your callers want to differentiate between errors:
 type

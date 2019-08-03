@@ -158,6 +158,16 @@ func ok*(self: var Result, v: auto) {.inline.} =
   ## Example: `result.ok(42)`
   self = Result.ok(v)
 
+func ok*[E](R: type Result[void, E]): R {.inline.} =
+  ## Initialize a result with a success and value
+  ## Example: `Result[int, string].ok(42)`
+  R(isOk: true)
+
+func ok*[E](self: var Result[void, E], v: auto) =
+  ## Initialize a result with a success and value
+  ## Example: `Result[int, string].ok(42)`
+  self = Result.ok()
+
 func err*(R: type Result, e: auto): R {.inline.} =
   ## Initialize the result to an error
   ## Example: `Result[int, string].err("uh-oh")`
@@ -511,5 +521,8 @@ when isMainModule:
       r[]
     except AnException:
       42
+
+  let voidRes = Result[void, int].ok()
+  doAssert voidRes.isOk
 
   doAssert testToException() == 42

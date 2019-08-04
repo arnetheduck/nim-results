@@ -181,18 +181,18 @@ func err*(self: var Result, v: auto) {.inline.} =
 template isErr*(self: Result): bool = not self.isOk
 
 func map*[T, E, A](
-    self: Result[T, E], f: func(x: T): A): Result[A, E] {.inline.} =
+    self: Result[T, E], f: proc(x: T): A): Result[A, E] {.inline.} =
   ## Transform value using f, or return error
   if self.isOk: result.ok(f(self.v))
   else: result.err(self.e)
 
 func flatMap*[T, E, A](
-    self: Result[T, E], f: func(x: T): Result[A, E]): Result[A, E] {.inline.} =
+    self: Result[T, E], f: proc(x: T): Result[A, E]): Result[A, E] {.inline.} =
   if self.isOk: f(self.v)
   else: Result[A, E].err(self.e)
 
 func mapErr*[T, E, A](
-    self: Result[T, E], f: func(x: E): A): Result[T, A] {.inline.} =
+    self: Result[T, E], f: proc(x: E): A): Result[T, A] {.inline.} =
   ## Transform error using f, or return value
   if self.isOk: result.ok(self.v)
   else: result.err(f(self.e))
@@ -505,7 +505,6 @@ when isMainModule:
   doAssert testQn()[] == 0
   doAssert testQn2().isErr
 
-
   type
     AnEnum = enum
       anEnumA
@@ -522,7 +521,21 @@ when isMainModule:
     except AnException:
       42
 
+  doAssert testToException() == 42
+
+  type
+    AnEnum2 = enum
+      anEnum2A
+      anEnum2B
+
+  func testToString(): int =
+    try:
+      var r = Result[int, AnEnum2].err(anEnum2A)
+      r[]
+    except ResultError[AnEnum2]:
+      42
+
+  doAssert testToString() == 42
+
   let voidRes = Result[void, int].ok()
   doAssert voidRes.isOk
-
-  doAssert testToException() == 42

@@ -142,43 +142,48 @@ type
     ##   travels up the call stack - needs more tinkering - some implicit
     ##   conversions would be nice here
 
-    case isOk*: bool
+    case o: bool
     of false:
       e: E
     of true:
       v: T
 
+template raiseResultError =
+  mixin toException
+  when E is ref Exception:
+    if self.e.isNil: # for example Result.default()!
+      raise ResultError[void](msg: "Trying to access value with err (nil)")
+    raise self.e
+  elif compiles(self.e.toException()):
+    raise self.e.toException()
+  elif compiles($self.e):
+    raise ResultError[E](
+      error: self.e, msg: "Trying to access value with err: " & $self.e)
+  else:
+    raise ResultError[E](error: self.e)
+
 func ok*(R: type Result, v: auto): R {.inline.} =
   ## Initialize a result with a success and value
   ## Example: `Result[int, string].ok(42)`
-  R(isOk: true, v: v)
+  R(o: true, v: v)
 
 func ok*(self: var Result, v: auto) {.inline.} =
   ## Set the result to success and update value
   ## Example: `result.ok(42)`
   self = Result.ok(v)
 
-func ok*[E](R: type Result[void, E]): R {.inline.} =
-  ## Initialize a result with a success and value
-  ## Example: `Result[int, string].ok(42)`
-  R(isOk: true)
-
-func ok*[E](self: var Result[void, E], v: auto) =
-  ## Initialize a result with a success and value
-  ## Example: `Result[int, string].ok(42)`
-  self = Result.ok()
-
 func err*(R: type Result, e: auto): R {.inline.} =
   ## Initialize the result to an error
   ## Example: `Result[int, string].err("uh-oh")`
-  R(isOk: false, e: e)
+  R(o: false, e: e)
 
 func err*(self: var Result, v: auto) {.inline.} =
   ## Set the result as an error
   ## Example: `result.err("uh-oh")`
   self = Result.err(v)
 
-template isErr*(self: Result): bool = not self.isOk
+template isOk*(self: Result): bool = self.o
+template isErr*(self: Result): bool = not self.o
 
 func map*[T, E, A](
     self: Result[T, E], f: proc(x: T): A): Result[A, E] {.inline.} =
@@ -191,7 +196,7 @@ func flatMap*[T, E, A](
   if self.isOk: f(self.v)
   else: Result[A, E].err(self.e)
 
-func mapErr*[T, E, A](
+func mapErr*[T: not void, E, A](
     self: Result[T, E], f: proc(x: E): A): Result[T, A] {.inline.} =
   ## Transform error using f, or return value
   if self.isOk: result.ok(self.v)
@@ -257,38 +262,7 @@ func `==`(lhs, rhs: Result): bool {.inline.} =
   else:
     lhs.e == rhs.e
 
-template raiseResultError =
-  mixin toException
-  when E is ref Exception:
-    raise self.e
-  elif compiles(self.e.toException()):
-    raise self.e.toException()
-  elif compiles($self.e):
-    raise ResultError[E](
-      error: self.e, msg: "Trying to access value with err: " & $self.e)
-  else:
-    raise ResultError[E](error: self.e)
-
-func `[]`*[T, E](self: Result[T, E]): T {.inline.} =
-  ## Fetch value of result if set, or raise error as an Exception
-  if self.isErr: raiseResultError
-
-  self.v
-
-func `[]`*[T, E](self: var Result[T, E]): var T {.inline.} =
-  ## Fetch value of result if set, or raise error as an Exception
-  if self.isErr: raiseResultError
-
-  self.v
-
-template unsafeGet*[T, E](self: Result[T, E]): T =
-  ## Fetch value of result if set, undefined behavior if unset
-  ## See also: Option.unsafeGet
-  assert not self.isErr
-
-  self.v
-
-func get*[T, E](self: Result[T, E]): T {.inline.} =
+func get*[T: not void, E](self: Result[T, E]): T {.inline.} =
   ## Fetch value of result if set, or raise error as an Exception
   ## See also: Option.get
   if self.isErr: raiseResultError
@@ -305,6 +279,21 @@ func get*[T, E](self: var Result[T, E]): var T {.inline.} =
   ## Fetch value of result if set, or raise error as an Exception
   ## See also: Option.get
   if self.isErr: raiseResultError
+
+  self.v
+
+template `[]`*[T, E](self: Result[T, E]): T =
+  ## Fetch value of result if set, or raise error as an Exception
+  self.get()
+
+template `[]`*[T, E](self: var Result[T, E]): var T =
+  ## Fetch value of result if set, or raise error as an Exception
+  self.get()
+
+template unsafeGet*[T, E](self: Result[T, E]): T =
+  ## Fetch value of result if set, undefined behavior if unset
+  ## See also: Option.unsafeGet
+  assert not self.isErr
 
   self.v
 
@@ -325,6 +314,74 @@ template valueOr*[T, E](self: Result[T, E], def: T): T =
   ## Fetch value of result if set, or supplied default
   ## default will not be evaluated iff value is set
   self.get(def)
+
+# void support
+
+func ok*[E](R: type Result[void, E]): R {.inline.} =
+  ## Initialize a result with a success and value
+  ## Example: `Result[int, string].ok(42)`
+  R(o: true)
+
+func ok*[E](self: var Result[void, E]) {.inline.} =
+  ## Set the result to success and update value
+  ## Example: `result.ok(42)`
+  self = Result[void, E].ok()
+
+func map*[E, A](
+    self: Result[void, E], f: proc(): A): Result[A, E] {.inline.} =
+  ## Transform value using f, or return error
+  if self.isOk: result.ok(f())
+  else: result.err(self.e)
+
+func flatMap*[E, A](
+    self: Result[void, E], f: proc(): Result[A, E]): Result[A, E] {.inline.} =
+  if self.isOk: f(self.v)
+  else: Result[A, E].err(self.e)
+
+func mapErr*[E, A](
+    self: Result[void, E], f: proc(x: E): A): Result[void, A] {.inline.} =
+  ## Transform error using f, or return value
+  if self.isOk: result.ok()
+  else: result.err(f(self.e))
+
+func map*[T, E](
+    self: Result[T, E], f: proc(x: T)): Result[void, E] {.inline.} =
+  ## Transform value using f, or return error
+  if self.isOk: f(self.v); result.ok()
+  else: result.err(self.e)
+
+func get*[E](self: Result[void, E]) {.inline.} =
+  ## Fetch value of result if set, or raise error as an Exception
+  ## See also: Option.get
+  if self.isErr: raiseResultError
+
+template `[]`*[E](self: Result[void, E]) =
+  ## Fetch value of result if set, or raise error as an Exception
+  self.get()
+
+template unsafeGet*[E](self: Result[void, E]) =
+  ## Fetch value of result if set, undefined behavior if unset
+  ## See also: Option.unsafeGet
+  assert not self.isErr
+
+func `$`*[E](self: Result[void, E]): string =
+  ## Returns string representation of `self`
+  if self.isOk: "Ok()"
+  else: "Err(" & $self.e & ")"
+
+template value*[E](self: Result[void, E]) = self.get()
+template value*[E](self: var Result[void, E]) = self.get()
+
+template `?`*[T, E](self: Result[T, E]): T =
+  ## Early return - if self is an error, we will return from the current
+  ## function, else we'll move on..
+  ## Experimental
+  # TODO the v copy is here to prevent multiple evaluations of self - could
+  #      probably avoid it with some fancy macro magic..
+  let v = self
+  if v.isErr: return v
+
+  v.value
 
 when isMainModule:
   type R = Result[int, string]
@@ -486,14 +543,6 @@ when isMainModule:
 
   doAssert testCapture().isErr
 
-  template `?`[T, E](self: Result[T, E]): T =
-    ## Early return - if self is an error, we will return from the current
-    ## function, else we'll move on..
-    let v = self
-    if v.isErr: return v
-
-    v.value
-
   func testQn(): Result[int, string] =
     let x = ?works() - ?works()
     result.ok(x)
@@ -537,5 +586,22 @@ when isMainModule:
 
   doAssert testToString() == 42
 
-  let voidRes = Result[void, int].ok()
+  type VoidRes = Result[void, int]
+
+  let voidRes = VoidRes.ok()
   doAssert voidRes.isOk
+
+  voidRes.get()
+
+  doAssert voidRes.map(proc (): int = 42).get() == 42
+
+  doAssert voidRes.map(proc (): int = 42).get() == 42
+  a.map(proc(x: int) = discard).get()
+
+  try:
+    b.map(proc(x: int) = discard).get()
+    doAssert false
+  except:
+    discard
+
+  doAssert VoidRes.err(10).mapErr(proc(x: int): int = 42).error() == 42

@@ -148,8 +148,7 @@ type
     of true:
       v: T
 
-template raiseResultError =
-  mixin toException
+func raiseResultError[T, E](self: Result[T, E]) {.noreturn.} =
   when E is ref Exception:
     if self.e.isNil: # for example Result.default()!
       raise ResultError[void](msg: "Trying to access value with err (nil)")
@@ -265,7 +264,7 @@ func `==`(lhs, rhs: Result): bool {.inline.} =
 func get*[T: not void, E](self: Result[T, E]): T {.inline.} =
   ## Fetch value of result if set, or raise error as an Exception
   ## See also: Option.get
-  if self.isErr: raiseResultError
+  if self.isErr: self.raiseResultError()
 
   self.v
 
@@ -278,7 +277,7 @@ func get*[T, E](self: Result[T, E], otherwise: T): T {.inline.} =
 func get*[T, E](self: var Result[T, E]): var T {.inline.} =
   ## Fetch value of result if set, or raise error as an Exception
   ## See also: Option.get
-  if self.isErr: raiseResultError
+  if self.isErr: self.raiseResultError()
 
   self.v
 
@@ -353,7 +352,7 @@ func map*[T, E](
 func get*[E](self: Result[void, E]) {.inline.} =
   ## Fetch value of result if set, or raise error as an Exception
   ## See also: Option.get
-  if self.isErr: raiseResultError
+  if self.isErr: self.raiseResultError()
 
 template `[]`*[E](self: Result[void, E]) =
   ## Fetch value of result if set, or raise error as an Exception
@@ -387,42 +386,43 @@ when isMainModule:
   type R = Result[int, string]
 
   # Basic usage, producer
-  func works(): R =
-    R.ok(42)
-  func fails(): R =
-    R.err("dummy")
-
-  func works2(): R =
-    result.ok(42)
-  func fails2(): R =
-    result.err("dummy")
+  func works(): R = R.ok(42)
+  func works2(): R = result.ok(42)
+  func fails(): R = R.err("dummy")
+  func fails2(): R = result.err("dummy")
 
   func raises(): int =
     raise newException(Exception, "hello")
 
   # Basic usage, consumer
   let
-    a = works()
-    b = fails()
+    rOk = works()
+    rOk2 = works2()
+    rErr = fails()
+    rErr2 = fails2()
 
-  doAssert a.isOk
-  doAssert a.get() == 42
-  doAssert (not a.isErr)
+  doAssert rOk.isOk
+  doAssert rOk2.isOk
+  doAssert rOk.get() == 42
+  doAssert (not rOk.isErr)
+  doAssert rErr.isErr
+  doAssert rErr2.isErr
 
   # Combine
-  let xxx = a and b
-  doAssert (not xxx.isOk)
-  doAssert (a or b).isOk
+  doAssert (rOk and rErr).isErr
+  doAssert (rErr and rOk).isErr
+  doAssert (rOk or rErr).isOk
+  doAssert (rErr or rOk).isOk
 
   # Exception on access
-  let va = try: discard a.error; false except: true
+  let va = try: discard rOk.error; false except: true
   doAssert va, "not an error, should raise"
 
   # Exception on access
-  let vb = try: discard b.value; false except: true
-  doAssert vb, "not an error, should raise"
+  let vb = try: discard rErr.value; false except: true
+  doAssert vb, "not an value, should raise"
 
-  var x = a
+  var x = rOk
 
   # Mutate
   x.err("failed now")
@@ -437,13 +437,13 @@ when isMainModule:
 
   # De-reference
   try:
-    echo b[]
+    echo rErr[]
     doAssert false
   except:
     discard
 
-  doAssert a.valueOr(50) == a.value
-  doAssert b.valueOr(50) == 50
+  doAssert rOk.valueOr(50) == rOk.value
+  doAssert rErr.valueOr(50) == 50
 
   # Comparisons
   doAssert (works() == works2())
@@ -455,14 +455,14 @@ when isMainModule:
     counter += 1
     R.ok(counter)
 
-  doAssert (b and incCounter()).isErr, "b fails"
-  doAssert counter == 0, "should fail fast on b"
+  doAssert (rErr and incCounter()).isErr, "b fails"
+  doAssert counter == 0, "should fail fast on rErr"
 
   # Mapping
-  doAssert (a.map(func(x: int): string = $x)[] == $a.value)
-  doAssert (a.flatMap(
-    proc(x: int): Result[string, string] = Result[string, string].ok($x))[] == $a.value)
-  doAssert (b.mapErr(func(x: string): string = x & "no!").error == (b.error & "no!"))
+  doAssert (rOk.map(func(x: int): string = $x)[] == $rOk.value)
+  doAssert (rOk.flatMap(
+    proc(x: int): Result[string, string] = Result[string, string].ok($x))[] == $rOk.value)
+  doAssert (rErr.mapErr(func(x: string): string = x & "no!").error == (rErr.error & "no!"))
 
   # Exception interop
   let e = capture(int, newException(Exception, "test"))
@@ -477,10 +477,10 @@ when isMainModule:
   if (let v = works(); v.isOk):
     doAssert v[] == v.value
 
-  doAssert $a == "Ok(42)"
+  doAssert $rOk == "Ok(42)"
 
-  doAssert a.mapConvert(int64)[] == int64(42)
-  doAssert a.mapCast(int8)[] == int8(42)
+  doAssert rOk.mapConvert(int64)[] == int64(42)
+  doAssert rOk.mapCast(int8)[] == int8(42)
 
   # TODO there's a bunch of operators that one could lift through magic - this
   #      is mainly an example
@@ -496,7 +496,7 @@ when isMainModule:
       R.err(self.e)
 
   # Simple lifting..
-  doAssert (a + a)[] == a.value + a.value
+  doAssert (rOk + rOk)[] == rOk.value + rOk.value
 
   iterator items[T, E](self: Result[T, E]): T =
     ## Iterate over result as if it were a collection of either 0 or 1 items
@@ -507,7 +507,7 @@ when isMainModule:
 
   # Iteration
   var counter2 = 0
-  for v in a:
+  for v in rOk:
     counter2 += 1
 
   doAssert counter2 == 1, "one-item collection when set"
@@ -588,20 +588,40 @@ when isMainModule:
 
   type VoidRes = Result[void, int]
 
-  let voidRes = VoidRes.ok()
-  doAssert voidRes.isOk
+  func worksVoid(): VoidRes = VoidRes.ok()
+  func worksVoid2(): VoidRes = result.ok()
+  func failsVoid(): VoidRes = VoidRes.err(42)
+  func failsVoid2(): VoidRes = result.err(42)
 
-  voidRes.get()
+  let
+    vOk = worksVoid()
+    vOk2 = worksVoid2()
+    vErr = failsVoid()
+    vErr2 = failsVoid2()
 
-  doAssert voidRes.map(proc (): int = 42).get() == 42
+  doAssert vOk.isOk
+  doAssert vOk2.isOk
+  doAssert vErr.isErr
+  doAssert vErr2.isErr
 
-  doAssert voidRes.map(proc (): int = 42).get() == 42
-  a.map(proc(x: int) = discard).get()
+  vOk.get()
+
+  doAssert vOk.map(proc (): int = 42).get() == 42
+
+  rOk.map(proc(x: int) = discard).get()
 
   try:
-    b.map(proc(x: int) = discard).get()
+    rErr.map(proc(x: int) = discard).get()
     doAssert false
   except:
     discard
 
-  doAssert VoidRes.err(10).mapErr(proc(x: int): int = 42).error() == 42
+  doAssert vErr.mapErr(proc(x: int): int = 10).error() == 10
+
+
+  # Compiler bug: https://github.com/nim-lang/Nim/issues/11941
+
+  #template ok2*(R: type Result, v: auto): R =
+  #  R(o: true, v: v)
+
+  #var bug = Result[int, int].ok2(42)

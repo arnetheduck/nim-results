@@ -161,25 +161,25 @@ func raiseResultError[T, E](self: Result[T, E]) {.noreturn.} =
   else:
     raise ResultError[E](error: self.e)
 
-func ok*(R: type Result, v: auto): R {.inline.} =
+template ok*(R: type Result, x: auto): auto =
   ## Initialize a result with a success and value
   ## Example: `Result[int, string].ok(42)`
-  R(o: true, v: v)
+  R(o: true, v: x)
 
-func ok*(self: var Result, v: auto) {.inline.} =
+template ok*(self: var Result, x: auto) =
   ## Set the result to success and update value
   ## Example: `result.ok(42)`
-  self = Result.ok(v)
+  self = ok(type self, x)
 
-func err*(R: type Result, e: auto): R {.inline.} =
+template err*(R: type Result, x: auto): auto =
   ## Initialize the result to an error
   ## Example: `Result[int, string].err("uh-oh")`
-  R(o: false, e: e)
+  R(o: false, e: x)
 
-func err*(self: var Result, v: auto) {.inline.} =
+template err*(self: var Result, x: auto) =
   ## Set the result as an error
   ## Example: `result.err("uh-oh")`
-  self = Result.err(v)
+  self = err(type self, x)
 
 template isOk*(self: Result): bool = self.o
 template isErr*(self: Result): bool = not self.o
@@ -316,15 +316,15 @@ template valueOr*[T, E](self: Result[T, E], def: T): T =
 
 # void support
 
-func ok*[E](R: type Result[void, E]): R {.inline.} =
+template ok*[E](R: type Result[void, E]): auto =
   ## Initialize a result with a success and value
   ## Example: `Result[int, string].ok(42)`
   R(o: true)
 
-func ok*[E](self: var Result[void, E]) {.inline.} =
+template ok*[E](self: var Result[void, E]) =
   ## Set the result to success and update value
   ## Example: `result.ok(42)`
-  self = Result[void, E].ok()
+  self = (type self).ok()
 
 func map*[E, A](
     self: Result[void, E], f: proc(): A): Result[A, E] {.inline.} =
@@ -617,11 +617,3 @@ when isMainModule:
     discard
 
   doAssert vErr.mapErr(proc(x: int): int = 10).error() == 10
-
-
-  # Compiler bug: https://github.com/nim-lang/Nim/issues/11941
-
-  #template ok2*(R: type Result, v: auto): R =
-  #  R(o: true, v: v)
-
-  #var bug = Result[int, int].ok2(42)

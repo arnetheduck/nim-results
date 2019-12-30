@@ -292,7 +292,7 @@ template `[]`*[T, E](self: var Result[T, E]): var T =
 template unsafeGet*[T, E](self: Result[T, E]): T =
   ## Fetch value of result if set, undefined behavior if unset
   ## See also: Option.unsafeGet
-  assert not self.isErr
+  assert not isErr(self)
 
   self.v
 

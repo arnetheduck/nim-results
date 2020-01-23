@@ -5,9 +5,9 @@
 # at your option. This file may not be copied, modified, or distributed except according to those terms.
 
 type
-  # TODO ValueError is a Defect - is that what we want here really? It's what
-  #      Option does though..
-  ResultError[E] = ref object of ValueError
+  ResultError*[E] = ref object of ValueError
+    ## Error raised when trying to access value of result when error is set
+    ## Note: If error is of exception type, it will be raised instead!
     error: E
 
   Result*[T, E] = object
@@ -181,6 +181,9 @@ template err*(self: var Result, x: auto) =
   ## Example: `result.err("uh-oh")`
   self = err(type self, x)
 
+template ok(v: auto): auto = typeof(result).ok(v)
+template err(v: auto): auto = typeof(result).err(v)
+
 template isOk*(self: Result): bool = self.o
 template isErr*(self: Result): bool = not self.o
 
@@ -253,7 +256,7 @@ template capture*(T: type, e: ref Exception): Result[T, ref Exception] =
     ret = R.err(getCurrentException())
   ret
 
-func `==`(lhs, rhs: Result): bool {.inline.} =
+func `==`*(lhs, rhs: Result): bool {.inline.} =
   if lhs.isOk != rhs.isOk:
     false
   elif lhs.isOk:
@@ -477,6 +480,12 @@ when isMainModule:
   if (let v = works(); v.isOk):
     doAssert v[] == v.value
 
+  # Can formalise it into a template (https://github.com/arnetheduck/nim-result/issues/8)
+  template `?=`*(v: untyped{nkIdent}, vv: Result): bool =
+    (let vr = vv; template v: auto {.used.} = unsafeGet(vr); vr.isOk)
+  if f ?= works():
+    doAssert f == works().value
+
   doAssert $rOk == "Ok(42)"
 
   doAssert rOk.mapConvert(int64)[] == int64(42)
@@ -489,11 +498,11 @@ when isMainModule:
     type R = type(other)
     if self.isOk:
       if other.isOk:
-        R.ok(self.v + other.value)
+        R.ok(self.value + other.value)
       else:
         R.err(other.error)
     else:
-      R.err(self.e)
+      R.err(self.error)
 
   # Simple lifting..
   doAssert (rOk + rOk)[] == rOk.value + rOk.value
@@ -503,7 +512,7 @@ when isMainModule:
     ## TODO should a Result[seq[X]] iterate over items in seq? there are
     ##      arguments for and against
     if self.isOk:
-      yield self.v
+      yield self.value
 
   # Iteration
   var counter2 = 0
@@ -512,16 +521,14 @@ when isMainModule:
 
   doAssert counter2 == 1, "one-item collection when set"
 
-  # Technically, it's possible to make a template that fetches type from
-  # result - whether this is a good idea is up for discussion:
-  template ok(v: untyped) {.dirty.} =
-    result.ok(v)
-    return
-
   func testOk(): Result[int, string] =
     ok 42
 
+  func testErr(): Result[int, string] =
+    err "323"
+
   doAssert testOk()[] == 42
+  doAssert testErr().error == "323"
 
   # It's also possible to use the same trick for stack capture:
   template capture*(): untyped =

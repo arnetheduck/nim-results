@@ -1,0 +1,24 @@
+#!/bin/bash
+# helper to copy result to nim-stew
+
+STEW="../nim-stew/"
+
+[[ -d "$STEW/stew" ]] || { echo "get stew into ../stew" ; exit 1; }
+
+CODE="$STEW/stew/result.nim"
+TEST="$STEW/tests/test_result.nim"
+
+echo "# nim-result is also available stand-alone from https://github.com/arnetheduck/nim-result/" > "$CODE"
+echo >> "$CODE"
+
+echo "# nim-result is also available stand-alone from https://github.com/arnetheduck/nim-result/" > "$TEST"
+echo >> "$TEST"
+
+let NCODE=$(grep -n MainModule result.nim | cut -f1 -d:)-1
+let NTESTS=$NCODE+2
+head -n $NCODE result.nim >> "$CODE"
+
+echo "import ../stew/result" >> "$TEST"
+
+tail -n +$NTESTS result.nim | cut -c3- >> "$TEST"
+

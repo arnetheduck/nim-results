@@ -3,7 +3,7 @@
 
 STEW="../nim-stew/"
 
-[[ -d "$STEW/stew" ]] || { echo "get stew into ../stew" ; exit 1; }
+[[ -d "$STEW/stew" ]] || { echo "get stew into $STEW" ; exit 1; }
 
 CODE="$STEW/stew/result.nim"
 TEST="$STEW/tests/test_result.nim"
@@ -21,4 +21,3 @@ head -n $NCODE result.nim >> "$CODE"
 echo "import ../stew/result" >> "$TEST"
 
 tail -n +$NTESTS result.nim | cut -c3- >> "$TEST"
-

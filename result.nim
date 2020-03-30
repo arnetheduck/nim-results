@@ -6,9 +6,9 @@
 
 type
   ResultError*[E] = object of ValueError
-    ## Error raised when using `tryGet` value of result when error is set
+    ## Error raised when trying to access value of result when error is set
     ## Note: If error is of exception type, it will be raised instead!
-    error: E
+    error*: E
 
   Result*[T, E] = object
     ## Result type that can hold either a value or an error, but not both
@@ -155,6 +155,9 @@ type
     ##   conversions would be nice here
     ## * Pattern matching in rust allows convenient extraction of value or error
     ##   in one go.
+    ##
+    ## Relevant nim bugs:
+    ## https://github.com/nim-lang/Nim/issues/13799
 
     case o: bool
     of false:
@@ -177,37 +180,28 @@ func raiseResultError[T, E](self: Result[T, E]) {.noreturn.} =
   else:
     raise (res ResultError[E])(msg: "Trying to access value with err", error: self.e)
 
-template checkOk(self: Result) =
-  # TODO This condition is a bit odd in that it raises different exceptions
-  #      depending on the type of E - this is done to support using Result as a
-  #      bridge type that can transport Exceptions
-  when E is ref Exception or compiles(toException(self.e)):
-    if not self.isOk: self.raiseResultError
-  else:
-    doAssert self.isOk, "Attempt to get a failed result"
-
-template ok*(R: type Result, x: auto): auto =
+template ok*[T, E](R: type Result[T, E], x: auto): R =
   ## Initialize a result with a success and value
   ## Example: `Result[int, string].ok(42)`
   R(o: true, v: x)
 
-template ok*(self: var Result, x: auto) =
+template ok*[T, E](self: var Result[T, E], x: auto) =
   ## Set the result to success and update value
   ## Example: `result.ok(42)`
   self = ok(type self, x)
 
-template err*(R: type Result, x: auto): auto =
+template err*[T, E](R: type Result[T, E], x: auto): R =
   ## Initialize the result to an error
   ## Example: `Result[int, string].err("uh-oh")`
   R(o: false, e: x)
 
-template err*(self: var Result, x: auto) =
+template err*[T, E](self: var Result[T, E], x: auto) =
   ## Set the result as an error
   ## Example: `result.err("uh-oh")`
   self = err(type self, x)
 
-template ok*(v: auto): auto = typeof(result).ok(v)
-template err*(v: auto): auto = typeof(result).err(v)
+template ok*(v: auto): auto = ok(typeof(result), v)
+template err*(v: auto): auto = err(typeof(result), v)
 
 template isOk*(self: Result): bool = self.o
 template isErr*(self: Result): bool = not self.o
@@ -243,7 +237,7 @@ func mapCast*[T0, E0](
   if self.isOk: result.ok(cast[T1](self.v))
   else: result.err(self.e)
 
-template `and`*(self, other: Result): Result =
+template `and`*[T, E](self, other: Result[T, E]): Result[T, E] =
   ## Evaluate `other` iff self.isOk, else return error
   ## fail-fast - will not evaluate other if a is an error
   ##
@@ -255,7 +249,7 @@ template `and`*(self, other: Result): Result =
     type R = type(other)
     R.err(self.e)
 
-template `or`*(self, other: Result): Result =
+template `or`*[T, E](self, other: Result[T, E]): Result[T, E] =
   ## Evaluate `other` iff not self.isOk, else return self
   ## fail-fast - will not evaluate other if a is a value
   ##
@@ -277,7 +271,7 @@ template catch*(body: typed): Result[type(body), ref CatchableError] =
   except CatchableError as e:
     R.err(e)
 
-template capture*[E: Exception](T: type, someExceptionExpr: ref E): auto =
+template capture*[E: Exception](T: type, someExceptionExpr: ref E): Result[T, ref E] =
   ## Evaluate someExceptionExpr and put the exception into a result, making sure
   ## to capture a call stack at the capture site:
   ##
@@ -298,7 +292,7 @@ template capture*[E: Exception](T: type, someExceptionExpr: ref E): auto =
     ret = R.err(caught)
   ret
 
-func `==`*(lhs, rhs: Result): bool {.inline.} =
+func `==`*[T0, E0, T1, E1](lhs: Result[T0, E0], rhs: Result[T1, E1]): bool {.inline.} =
   if lhs.isOk != rhs.isOk:
     false
   elif lhs.isOk:
@@ -307,44 +301,38 @@ func `==`*(lhs, rhs: Result): bool {.inline.} =
     lhs.e == rhs.e
 
 func get*[T: not void, E](self: Result[T, E]): T {.inline.} =
-  ## Fetch value of result if set, or raise
-  ## When E is an Exception, raise that exception - otherwise, raise a Defect
+  ## Fetch value of result if set, or raise error as an Exception
   ## See also: Option.get
-  checkOk(self)
-  self.v
+  if self.isErr: self.raiseResultError()
 
-func tryGet*[T: not void, E](self: Result[T, E]): T {.inline.} = # raises: [Defect, CatchableError] - but the calculated exception is more precise!
-  ## Fetch value of result if set, or raise
-  ## When E is an Exception, raise that exception - otherwise, raise a ResultError[E]
-  if not self.isOk: self.raiseResultError
   self.v
 
 func get*[T, E](self: Result[T, E], otherwise: T): T {.inline.} =
-  ## Fetch value of result if set, or return the value `otherwise`
+  ## Fetch value of result if set, or raise error as an Exception
+  ## See also: Option.get
   if self.isErr: otherwise
   else: self.v
 
 func get*[T, E](self: var Result[T, E]): var T {.inline.} =
-  ## Fetch value of result if set, or raise
-  ## When E is an Exception, raise that exception - otherwise, raise a Defect
+  ## Fetch value of result if set, or raise error as an Exception
   ## See also: Option.get
-  checkOk(self)
+  if self.isErr: self.raiseResultError()
+
   self.v
 
 template `[]`*[T, E](self: Result[T, E]): T =
-  ## Fetch value of result if set, or raise
-  ## When E is an Exception, raise that exception - otherwise, raise a Defect
+  ## Fetch value of result if set, or raise error as an Exception
   self.get()
 
 template `[]`*[T, E](self: var Result[T, E]): var T =
-  ## Fetch value of result if set, or raise
-  ## When E is an Exception, raise that exception - otherwise, raise a Defect
+  ## Fetch value of result if set, or raise error as an Exception
   self.get()
 
 template unsafeGet*[T, E](self: Result[T, E]): T =
   ## Fetch value of result if set, undefined behavior if unset
   ## See also: Option.unsafeGet
-  assert isOk(self)
+  assert not isErr(self)
+
   self.v
 
 func `$`*(self: Result): string =
@@ -353,7 +341,8 @@ func `$`*(self: Result): string =
   else: "Err(" & $self.e & ")"
 
 func error*[T, E](self: Result[T, E]): E =
-  doAssert self.isErr, "Result does not contain an error"
+  if self.isOk: raise (ref ResultError[void])(msg: "Result does not contain an error")
+
   self.e
 
 template value*[T, E](self: Result[T, E]): T = self.get()
@@ -375,6 +364,9 @@ template ok*[E](self: var Result[void, E]) =
   ## Set the result to success and update value
   ## Example: `result.ok(42)`
   self = (type self).ok()
+
+template ok*(): auto = ok(typeof(result))
+template err*(): auto = err(typeof(result))
 
 # TODO:
 # Supporting `map` and `get` operations on a `void` result is quite
@@ -404,16 +396,12 @@ func map*[T, E](
   else: result.err(self.e)
 
 func get*[E](self: Result[void, E]) {.inline.} =
-  ## Fetch value of result if set, or raise
+  ## Fetch value of result if set, or raise error as an Exception
   ## See also: Option.get
-  checkOk(self)
-
-func tryGet*[E](self: Result[void, E]) {.inline.} =
-  ## Fetch value of result if set, or raise a CatchableError
-  if not self.isOk: self.raiseResultError
+  if self.isErr: self.raiseResultError()
 
 template `[]`*[E](self: Result[void, E]) =
-  ## Fetch value of result if set, or raise
+  ## Fetch value of result if set, or raise error as an Exception
   self.get()
 
 template unsafeGet*[E](self: Result[void, E]) =
@@ -441,7 +429,7 @@ template `?`*[T, E](self: Result[T, E]): T =
   # TODO the v copy is here to prevent multiple evaluations of self - could
   #      probably avoid it with some fancy macro magic..
   let v = (self)
-  if v.isErr: return v
+  if v.isErr: return err(typeof(result), v.error)
 
   v.value
 
@@ -533,7 +521,7 @@ when isMainModule:
   doAssert e.error.msg == "test"
 
   try:
-    discard e.tryGet
+    discard e[]
     doAssert false, "should have raised"
   except ValueError as e:
     doAssert e.msg == "test"
@@ -629,7 +617,7 @@ when isMainModule:
   func testToString(): int =
     try:
       var r = Result[int, AnEnum2].err(anEnum2A)
-      r.tryGet
+      r[]
     except ResultError[AnEnum2]:
       42
 

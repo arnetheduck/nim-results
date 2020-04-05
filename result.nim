@@ -6,9 +6,13 @@
 
 type
   ResultError*[E] = object of ValueError
-    ## Error raised when trying to access value of result when error is set
-    ## Note: If error is of exception type, it will be raised instead!
+    ## Error raised when using `tryGet` value of result when error is set
+    ## See also Exception bridge mode
     error*: E
+
+  ResultDefect* = object of Defect
+    ## Defect raised when accessing value when error is set and vice versa
+    ## See also Exception bridge mode
 
   Result*[T, E] = object
     ## Result type that can hold either a value or an error, but not both
@@ -102,6 +106,15 @@ type
     ## nothing exceptional about exceptions (hello StopIterator). Python is
     ## rarely used to build reliable systems - its strengths lie elsewhere.
     ##
+    ## # Exception bridge mode
+    ##
+    ## When the error of a `Result` is an `Exception`, or a `toException` helper
+    ## is present for your error type, the "Exception bridge mode" is
+    ## enabled and instead of raising `Defect`, we will raise the given
+    ## `Exception` on access.
+    ##
+    ## This is an experimental feature that may be removed.
+    ##
     ## # Other languages
     ##
     ## Result-style error handling seems pretty popular lately, specially with
@@ -156,8 +169,41 @@ type
     ## * Pattern matching in rust allows convenient extraction of value or error
     ##   in one go.
     ##
+    ## # Performance considerations
+    ##
+    ## Compared to a simple return type, returning a Result sometimes incurs
+    ## an overhead. Compared to raising an exception, this overhead is very low.
+    ## Compared to returning a plain value, it may be significant, specially for
+    ## large value types (deeply nested `object`:s) and value-like types (large
+    ## `seq`:s):
+    ##
+    ## * Loss of RVO
+    ##   Nim does return-value-optimization by rewriting `proc f(): X` into
+    ##   `proc f(result: var X)` - in an expression like `let x = f()`, this
+    ##   allows it to avoid a copy from the "temporary" return value to `x` -
+    ##   when using Result, this copy currently happens always because you need
+    ##   to fetch the value from the Result in a second step: `let x = f().value`
+    ##   To solve this, "move" support in the compiler is needed - it would
+    ##   allow moving the value out of the temporary result created here.
+    ## * Bad codegen
+    ##   When doing RVO, Nim generates poor and slow code: it uses a construct
+    ##   called `genericReset` that will zero-initialize a value using dynamic
+    ##   RTTI - a process that the C compiler subsequently is unable to
+    ##   optimize. This applies to all types, and could be fixed in compiler.
+    ## * Double zero-initialization bug
+    ##   Nim has an initialization bug that causes additional poor performance:
+    ##   `var x = f()` will be expanded into `var x; zeroInit(x); f(x)` where
+    ##   `f(x)` will call the slow `genericReset` and zero-init `x` again,
+    ##   unnecessarily.
+    ## * Extra local copy in templates
+    ##   To avoid spurious evaluation of expressions in templates, we use a
+    ##   temporary variable sometimes - this means an unnecessary copy for some
+    ##   types.
+    ##
     ## Relevant nim bugs:
-    ## https://github.com/nim-lang/Nim/issues/13799
+    ## https://github.com/nim-lang/Nim/issues/13799 - type issues
+    ## https://github.com/nim-lang/Nim/issues/8745 - genericReset slow
+    ## https://github.com/nim-lang/Nim/issues/13879 - double-zero-init slow
 
     case o: bool
     of false:
@@ -165,7 +211,9 @@ type
     of true:
       v: T
 
-func raiseResultError[T, E](self: Result[T, E]) {.noreturn.} =
+func raiseResultError[T, E](self: Result[T, E]) {.noreturn, noinline.} =
+  # noinline because raising should take as little space as possible at call
+  # site
   mixin toException
 
   when E is ref Exception:
@@ -179,6 +227,20 @@ func raiseResultError[T, E](self: Result[T, E]) {.noreturn.} =
       error: self.e, msg: "Trying to access value with err: " & $self.e)
   else:
     raise (res ResultError[E])(msg: "Trying to access value with err", error: self.e)
+
+func raiseResultDefect(m: string, v: auto) {.noreturn, noinline.} =
+  if compiles($v): raise (ref ResultDefect)(msg: m & ": " & $v)
+  else: raise (ref ResultDefect)(msg: m)
+
+template checkOk(self: Result) =
+  # TODO This condition is a bit odd in that it raises different exceptions
+  #      depending on the type of E - this is done to support using Result as a
+  #      bridge type that can transport Exceptions
+  if not self.isOk:
+    when E is ref Exception or compiles(toException(self.e)):
+      raiseResultError(self)
+    else:
+      raiseResultDefect("Trying to acces value with err Result", self.e)
 
 template ok*[T, E](R: type Result[T, E], x: auto): R =
   ## Initialize a result with a success and value
@@ -225,9 +287,9 @@ func mapErr*[T: not void, E, A](
 
 func mapConvert*[T0, E0](
     self: Result[T0, E0], T1: type): Result[T1, E0] {.inline.} =
-  ## Convert result value to A using an implicit conversion
-  ## Would be nice if it was automatic...
-  if self.isOk: result.ok(self.v)
+  ## Convert result value to A using an conversion
+  # Would be nice if it was automatic...
+  if self.isOk: result.ok(T1(self.v))
   else: result.err(self.e)
 
 func mapCast*[T0, E0](
@@ -237,25 +299,21 @@ func mapCast*[T0, E0](
   if self.isOk: result.ok(cast[T1](self.v))
   else: result.err(self.e)
 
-template `and`*[T, E](self, other: Result[T, E]): Result[T, E] =
+template `and`*[T0, E, T1](self: Result[T0, E], other: Result[T1, E]): Result[T1, E] =
   ## Evaluate `other` iff self.isOk, else return error
   ## fail-fast - will not evaluate other if a is an error
-  ##
-  ## TODO: This API is unsafe due to potential multiple
-  ## evaluation of the `self` parameter.
-  if self.isOk:
+  let s = self
+  if s.isOk:
     other
   else:
     type R = type(other)
-    R.err(self.e)
+    R.err(s.e)
 
 template `or`*[T, E](self, other: Result[T, E]): Result[T, E] =
   ## Evaluate `other` iff not self.isOk, else return self
   ## fail-fast - will not evaluate other if a is a value
-  ##
-  ## TODO: This API is unsafe due to potential multiple
-  ## evaluation of the `self` parameter.
-  if self.isOk: self
+  let s = self
+  if s.isOk: s
   else: other
 
 template catch*(body: typed): Result[type(body), ref CatchableError] =
@@ -301,38 +359,63 @@ func `==`*[T0, E0, T1, E1](lhs: Result[T0, E0], rhs: Result[T1, E1]): bool {.inl
     lhs.e == rhs.e
 
 func get*[T: not void, E](self: Result[T, E]): T {.inline.} =
-  ## Fetch value of result if set, or raise error as an Exception
+  ## Fetch value of result if set, or raise Defect
+  ## Exception bridge mode: raise given Exception instead
   ## See also: Option.get
-  if self.isErr: self.raiseResultError()
+  checkOk(self)
+  self.v
 
+func tryGet*[T: not void, E](self: Result[T, E]): T {.inline.} =
+  ## Fetch value of result if set, or raise
+  ## When E is an Exception, raise that exception - otherwise, raise a ResultError[E]
+  if not self.isOk: self.raiseResultError
   self.v
 
 func get*[T, E](self: Result[T, E], otherwise: T): T {.inline.} =
-  ## Fetch value of result if set, or raise error as an Exception
-  ## See also: Option.get
+  ## Fetch value of result if set, or return the value `otherwise`
   if self.isErr: otherwise
   else: self.v
 
 func get*[T, E](self: var Result[T, E]): var T {.inline.} =
-  ## Fetch value of result if set, or raise error as an Exception
+  ## Fetch value of result if set, or raise Defect
+  ## Exception bridge mode: raise given Exception instead
   ## See also: Option.get
-  if self.isErr: self.raiseResultError()
-
+  checkOk(self)
   self.v
 
 template `[]`*[T, E](self: Result[T, E]): T =
-  ## Fetch value of result if set, or raise error as an Exception
+  ## Fetch value of result if set, or raise Defect
+  ## Exception bridge mode: raise given Exception instead
   self.get()
 
 template `[]`*[T, E](self: var Result[T, E]): var T =
-  ## Fetch value of result if set, or raise error as an Exception
+  ## Fetch value of result if set, or raise Defect
+  ## Exception bridge mode: raise given Exception instead
   self.get()
 
 template unsafeGet*[T, E](self: Result[T, E]): T =
   ## Fetch value of result if set, undefined behavior if unset
   ## See also: Option.unsafeGet
-  assert not isErr(self)
+  assert isOk(self)
+  self.v
 
+func expect*[T: not void, E](self: Result[T, E], m: string): T =
+  ## Return value of Result, or raise a `Defect` with the given message - use
+  ## this helper to extract the value when an error is not expected, for example
+  ## because the program logic dictates that the operation should never fail
+  ##
+  ## ```nim
+  ## let r = Result[int, int].ok(42)
+  ## # Put here a helpful comment why you think this won't fail
+  ## echo r.expect("r was just set to ok(42)")
+  ## ```
+  if not self.isOk():
+    raiseResultDefect(m, self.error)
+  self.v
+
+func expect*[T: not void, E](self: var Result[T, E], m: string): var T =
+  if not self.isOk():
+    raiseResultDefect(m, self.error)
   self.v
 
 func `$`*(self: Result): string =
@@ -341,7 +424,12 @@ func `$`*(self: Result): string =
   else: "Err(" & $self.e & ")"
 
 func error*[T, E](self: Result[T, E]): E =
-  if self.isOk: raise (ref ResultError[void])(msg: "Result does not contain an error")
+  ## Fetch error of result if set, or raise Defect
+  if not self.isErr:
+    when T is not void:
+      raiseResultDefect("Trying to access error when value is set", self.v)
+    else:
+      raise (ref ResultDefect)(msg: "Trying to access error when value is set")
 
   self.e
 
@@ -396,18 +484,26 @@ func map*[T, E](
   else: result.err(self.e)
 
 func get*[E](self: Result[void, E]) {.inline.} =
-  ## Fetch value of result if set, or raise error as an Exception
+  ## Fetch value of result if set, or raise
   ## See also: Option.get
-  if self.isErr: self.raiseResultError()
+  checkOk(self)
+
+func tryGet*[E](self: Result[void, E]) {.inline.} =
+  ## Fetch value of result if set, or raise a CatchableError
+  if not self.isOk: self.raiseResultError
 
 template `[]`*[E](self: Result[void, E]) =
-  ## Fetch value of result if set, or raise error as an Exception
+  ## Fetch value of result if set, or raise
   self.get()
 
 template unsafeGet*[E](self: Result[void, E]) =
   ## Fetch value of result if set, undefined behavior if unset
   ## See also: Option.unsafeGet
   assert not self.isErr
+
+func expect*[E](self: Result[void, E], msg: string) =
+  if not self.isOk():
+    raise (ref ResultDefect)(msg: msg)
 
 func `$`*[E](self: Result[void, E]): string =
   ## Returns string representation of `self`
@@ -465,6 +561,9 @@ when isMainModule:
   doAssert (rOk or rErr).isOk
   doAssert (rErr or rOk).isOk
 
+  # `and` heterogenous types
+  doAssert (rOk and rOk.map(proc(x: auto): auto = $x))[] == $(rOk[])
+
   # Exception on access
   let va = try: discard rOk.error; false except: true
   doAssert va, "not an error, should raise"
@@ -521,7 +620,7 @@ when isMainModule:
   doAssert e.error.msg == "test"
 
   try:
-    discard e[]
+    discard e.tryGet
     doAssert false, "should have raised"
   except ValueError as e:
     doAssert e.msg == "test"
@@ -540,6 +639,19 @@ when isMainModule:
 
   doAssert rOk.mapConvert(int64)[] == int64(42)
   doAssert rOk.mapCast(int8)[] == int8(42)
+  doAssert rOk.mapConvert(uint64)[] == uint64(42)
+
+  try:
+    discard rErr.get()
+    doAssert false
+  except Defect: # TODO catching defects is undefined behaviour, use external test suite?
+    discard
+
+  try:
+    discard rOk.error()
+    doAssert false
+  except Defect: # TODO catching defects is undefined behaviour, use external test suite?
+    discard
 
   # TODO there's a bunch of operators that one could lift through magic - this
   #      is mainly an example
@@ -580,6 +692,8 @@ when isMainModule:
   doAssert testOk()[] == 42
   doAssert testErr().error == "323"
 
+  doAssert testOk().expect("testOk never fails") == 42
+
   func testQn(): Result[int, string] =
     let x = ?works() - ?works()
     result.ok(x)
@@ -617,7 +731,7 @@ when isMainModule:
   func testToString(): int =
     try:
       var r = Result[int, AnEnum2].err(anEnum2A)
-      r[]
+      r.tryGet
     except ResultError[AnEnum2]:
       42
 
@@ -642,6 +756,7 @@ when isMainModule:
   doAssert vErr2.isErr
 
   vOk.get()
+  vOk.expect("should never fail")
 
   doAssert vOk.map(proc (): int = 42).get() == 42
 

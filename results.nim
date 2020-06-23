@@ -364,8 +364,8 @@ template `and`*[T0, E, T1](self: Result[T0, E], other: Result[T1, E]): Result[T1
   else:
     when type(self) is type(other):
       s
-  else:
-    type R = type(other)
+    else:
+      type R = type(other)
       err(R, s.e)
 
 template `or`*[T, E0, E1](self: Result[T, E0], other: Result[T, E1]): Result[T, E1] =
@@ -664,8 +664,8 @@ when isMainModule:
   # `and` heterogenous types
   doAssert (rOk and rOk.map(proc(x: auto): auto = $x))[] == $(rOk[])
 
-# `or` heterogenous types
-doAssert (rErr or rErr.mapErr(proc(x: auto): auto = len(x))).error == len(rErr.error)
+  # `or` heterogenous types
+  doAssert (rErr or rErr.mapErr(proc(x: auto): auto = len(x))).error == len(rErr.error)
 
   # Exception on access
   let va = try: discard rOk.error; false except: true
@@ -814,12 +814,12 @@ doAssert (rErr or rErr.mapErr(proc(x: auto): auto = len(x))).error == len(rErr.e
   doAssert testQn2().isErr
   doAssert testQn3()[]
 
-proc heterOr(): Result[int, int] =
-  let value = ? (rErr or err(42))  # TODO ? binds more tightly than `or` - can that be fixed?
-  doAssert value + 1 == value, "won't reach, ? will shortcut execution"
-  ok(value)
+  proc heterOr(): Result[int, int] =
+    let value = ? (rErr or err(42))  # TODO ? binds more tightly than `or` - can that be fixed?
+    doAssert value + 1 == value, "won't reach, ? will shortcut execution"
+    ok(value)
 
-doAssert heterOr().error() == 42
+  doAssert heterOr().error() == 42
 
   type
     AnEnum = enum
@@ -833,7 +833,7 @@ doAssert heterOr().error() == 42
   func testToException(): int =
     try:
       var r = Result[int, AnEnum].err(anEnumA)
-    r.tryGet
+      r.tryGet
     except AnException:
       42
 

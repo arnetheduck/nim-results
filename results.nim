@@ -281,9 +281,9 @@ func raiseResultDefect(m: string) {.noreturn, noinline.} =
 template assertOk(self: Result) =
   if not self.o:
     when self.E isnot void:
-      raiseResultDefect("Trying to acces value with err Result", self.e)
+      raiseResultDefect("Trying to access value with err Result", self.e)
     else:
-      raiseResultDefect("Trying to acces value with err Result")
+      raiseResultDefect("Trying to access value with err Result")
 
 template ok*[T, E](R: type Result[T, E], x: auto): R =
   ## Initialize a result with a success and value
@@ -300,6 +300,12 @@ template err*[T, E](R: type Result[T, E], x: auto): R =
   ## Example: `Result[int, string].err("uh-oh")`
   R(o: false, e: x)
 
+template err*[T](R: type Result[T, cstring], x: string): R =
+  ## Initialize the result to an error
+  ## Example: `Result[int, string].err("uh-oh")`
+  const s = x
+  R(o: false, e: cstring(s))
+
 template err*[T](R: type Result[T, void]): R =
   R(o: false)
 
@@ -307,6 +313,10 @@ template err*[T, E](self: var Result[T, E], x: auto) =
   ## Set the result as an error
   ## Example: `result.err("uh-oh")`
   self = err(type self, x)
+
+template err*[T](self: var Result[T, cstring], x: string) =
+  const s = x # Make sure we don't return a dangling pointer
+  self = err(type self, cstring(s))
 
 template err*[T](self: var Result[T, void]) =
   ## Set the result as an error
@@ -486,12 +496,18 @@ func expect*[T: not void, E](self: Result[T, E], m: string): T =
   ## echo r.expect("r was just set to ok(42)")
   ## ```
   if not self.o:
-    raiseResultDefect(m, self.e)
+    when E isnot void:
+      raiseResultDefect(m, self.e)
+    else:
+      raiseResultDefect(m)
   self.v
 
 func expect*[T: not void, E](self: var Result[T, E], m: string): var T =
   if not self.o:
-    raiseResultDefect(m, self.e)
+    when E isnot void:
+      raiseResultDefect(m, self.e)
+    else:
+      raiseResultDefect(m)
   self.v
 
 func `$`*(self: Result): string =
@@ -609,7 +625,7 @@ template value*[E](self: var Result[void, E]) =
   mixin get
   self.get()
 
-template `?`*[T, E](self: Result[T, E]): T =
+template `?`*[T, E](self: Result[T, E]): auto =
   ## Early return - if self is an error, we will return from the current
   ## function, else we'll move on..
   ##
@@ -627,7 +643,8 @@ template `?`*[T, E](self: Result[T, E]): T =
     else:
       return err(typeof(result), v.e)
 
-  v.v
+  when not(T is void):
+    v.v
 
 when isMainModule:
   type R = Result[int, string]
@@ -885,3 +902,23 @@ when isMainModule:
     discard
 
   doAssert vErr.mapErr(proc(x: int): int = 10).error() == 10
+
+
+  func voidF(): VoidRes =
+    ok()
+
+  func voidF2(): VoidRes =
+    ? voidF()
+
+    ok()
+
+  doAssert voidF2().isOk
+
+
+  type CSRes = Result[void, cstring]
+
+  func cstringF(s: string): CSRes =
+    when compiles(err(s)):
+      doAssert false
+
+  discard cstringF("test")

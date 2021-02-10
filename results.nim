@@ -430,11 +430,17 @@ template capture*[E: Exception](T: type, someExceptionExpr: ref E): Result[T, re
     ret = R.err(caught)
   ret
 
-func `==`*[T0, E0, T1, E1](lhs: Result[T0, E0], rhs: Result[T1, E1]): bool {.inline.} =
+func `==`*[T0: not void, E0, T1: not void, E1](lhs: Result[T0, E0], rhs: Result[T1, E1]): bool {.inline.} =
   if lhs.o != rhs.o:
     false
   elif lhs.o: # and rhs.o implied
     lhs.v == rhs.v
+  else:
+    lhs.e == rhs.e
+
+func `==`*[E0, E1](lhs: Result[void, E0], rhs: Result[void, E1]): bool {.inline.} =
+  if lhs.o != rhs.o:
+    false
   else:
     lhs.e == rhs.e
 
@@ -521,7 +527,7 @@ func error*[T, E](self: Result[T, E]): E =
     when T is not void:
       raiseResultDefect("Trying to access error when value is set", self.v)
     else:
-      raise (ref ResultDefect)(msg: "Trying to access error when value is set")
+      raiseResultDefect("Trying to access error when value is set")
   self.e
 
 template value*[T, E](self: Result[T, E]): T =
@@ -610,7 +616,10 @@ template unsafeGet*[E](self: Result[void, E]) =
 
 func expect*[E](self: Result[void, E], msg: string) =
   if not self.o:
-    raise (ref ResultDefect)(msg: msg)
+    when E isnot void:
+      raiseResultDefect(msg, self.e)
+    else:
+      raiseResultDefect(msg)
 
 func `$`*[E](self: Result[void, E]): string =
   ## Returns string representation of `self`
@@ -903,7 +912,6 @@ when isMainModule:
 
   doAssert vErr.mapErr(proc(x: int): int = 10).error() == 10
 
-
   func voidF(): VoidRes =
     ok()
 
@@ -922,3 +930,9 @@ when isMainModule:
       doAssert false
 
   discard cstringF("test")
+
+  # Compare void
+  block:
+    var a, b: Result[void, bool]
+    discard a == b
+

@@ -491,7 +491,7 @@ template `[]`*[T, E](self: var Result[T, E]): var T =
   mixin get
   self.get()
 
-func expect*[T: not void, E](self: Result[T, E], m: string): lent T =
+func expect*[T: not void, E](self: Result[T, E], m: string): lent T {.inline.} =
   ## Return value of Result, or raise a `Defect` with the given message - use
   ## this helper to extract the value when an error is not expected, for example
   ## because the program logic dictates that the operation should never fail
@@ -508,7 +508,7 @@ func expect*[T: not void, E](self: Result[T, E], m: string): lent T =
       raiseResultDefect(m)
   self.v
 
-func expect*[T: not void, E](self: var Result[T, E], m: string): var T =
+func expect*[T: not void, E](self: var Result[T, E], m: string): var T {.inline.} =
   if not self.o:
     when E isnot void:
       raiseResultDefect(m, self.e)

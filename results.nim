@@ -458,7 +458,7 @@ func tryGet*[T: not void, E](self: Result[T, E]): lent T {.inline.} =
   if not self.o: self.raiseResultError()
   self.v
 
-func get*[T, E](self: Result[T, E], otherwise: T): lent T {.inline.} =
+func get*[T, E](self: Result[T, E], otherwise: T): T {.inline.} =
   ## Fetch value of result if set, or return the value `otherwise`
   ## See `valueOr` for a template version that avoids evaluating `otherwise`
   ## unless necessary
@@ -472,6 +472,13 @@ func get*[T, E](self: var Result[T, E]): var T {.inline.} =
   assertOk(self)
   self.v
 
+func unsafeGet*[T, E](self: Result[T, E]): lent T {.inline.} =
+  ## Fetch value of result if set, undefined behavior if unset
+  ## See also: Option.unsafeGet
+  assert self.o
+
+  self.v
+
 template `[]`*[T: not void, E](self: Result[T, E]): T =
   ## Fetch value of result if set, or raise Defect
   ## Exception bridge mode: raise given Exception instead
@@ -483,13 +490,6 @@ template `[]`*[T, E](self: var Result[T, E]): var T =
   ## Exception bridge mode: raise given Exception instead
   mixin get
   self.get()
-
-template unsafeGet*[T, E](self: Result[T, E]): lent T =
-  ## Fetch value of result if set, undefined behavior if unset
-  ## See also: Option.unsafeGet
-  assert self.o
-
-  self.v
 
 func expect*[T: not void, E](self: Result[T, E], m: string): lent T =
   ## Return value of Result, or raise a `Defect` with the given message - use
@@ -521,13 +521,19 @@ func `$`*(self: Result): string =
   if self.o: "Ok(" & $self.v & ")"
   else: "Err(" & $self.e & ")"
 
-func error*[T, E](self: Result[T, E]): lent E =
+func error*[T, E](self: Result[T, E]): lent E {.inline.} =
   ## Fetch error of result if set, or raise Defect
   if self.o:
     when T is not void:
       raiseResultDefect("Trying to access error when value is set", self.v)
     else:
       raiseResultDefect("Trying to access error when value is set")
+  self.e
+
+func unsafeError*[T, E](self: Result[T, E]): lent E {.inline.} =
+  ## Fetch value of error if set, undefined behavior if unset
+  assert not self.o
+
   self.e
 
 template value*[T, E](self: Result[T, E]): T =

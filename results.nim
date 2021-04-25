@@ -444,21 +444,21 @@ func `==`*[E0, E1](lhs: Result[void, E0], rhs: Result[void, E1]): bool {.inline.
   else:
     lhs.e == rhs.e
 
-func get*[T: not void, E](self: Result[T, E]): T {.inline.} =
+func get*[T: not void, E](self: Result[T, E]): lent T {.inline.} =
   ## Fetch value of result if set, or raise Defect
   ## Exception bridge mode: raise given Exception instead
   ## See also: Option.get
   assertOk(self)
   self.v
 
-func tryGet*[T: not void, E](self: Result[T, E]): T {.inline.} =
+func tryGet*[T: not void, E](self: Result[T, E]): lent T {.inline.} =
   ## Fetch value of result if set, or raise
   ## When E is an Exception, raise that exception - otherwise, raise a ResultError[E]
   mixin raiseResultError
   if not self.o: self.raiseResultError()
   self.v
 
-func get*[T, E](self: Result[T, E], otherwise: T): T {.inline.} =
+func get*[T, E](self: Result[T, E], otherwise: T): lent T {.inline.} =
   ## Fetch value of result if set, or return the value `otherwise`
   ## See `valueOr` for a template version that avoids evaluating `otherwise`
   ## unless necessary
@@ -484,14 +484,14 @@ template `[]`*[T, E](self: var Result[T, E]): var T =
   mixin get
   self.get()
 
-template unsafeGet*[T, E](self: Result[T, E]): T =
+template unsafeGet*[T, E](self: Result[T, E]): lent T =
   ## Fetch value of result if set, undefined behavior if unset
   ## See also: Option.unsafeGet
   assert self.o
 
   self.v
 
-func expect*[T: not void, E](self: Result[T, E], m: string): T =
+func expect*[T: not void, E](self: Result[T, E], m: string): lent T =
   ## Return value of Result, or raise a `Defect` with the given message - use
   ## this helper to extract the value when an error is not expected, for example
   ## because the program logic dictates that the operation should never fail
@@ -521,7 +521,7 @@ func `$`*(self: Result): string =
   if self.o: "Ok(" & $self.v & ")"
   else: "Err(" & $self.e & ")"
 
-func error*[T, E](self: Result[T, E]): E =
+func error*[T, E](self: Result[T, E]): lent E =
   ## Fetch error of result if set, or raise Defect
   if self.o:
     when T is not void:

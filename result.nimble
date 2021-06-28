@@ -10,5 +10,13 @@ installFiles  = @["result.nim", "results.nim"]
 
 requires "nim >= 1.0.0"
 
+proc test(env, path: string) =
+  # Compilation language is controlled by TEST_LANG
+  var lang = "c"
+  if existsEnv"TEST_LANG":
+    lang = getEnv"TEST_LANG"
+  exec "nim " & lang & " " & env &
+    " -r " & path
+
 task test, "Runs the test suite":
-  exec "nim c -r result"
+  test "", "results.nim"

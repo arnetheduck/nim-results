@@ -71,7 +71,7 @@ jobs:
           echo '${{ github.workspace }}/nim/bin' >> $GITHUB_PATH
 
       - name: Run tests
-       run: |
+        run: |
           nim --version
           env TEST_LANG="${{ matrix.target.TEST_LANG }}" nimble test
 

@@ -5,9 +5,7 @@ jobs:
   build:
     strategy:
       fail-fast: false
-      max-parallel: 20
       matrix:
-        branch: [version-1-2, version-1-4, devel]
         target:
           - os: linux
             cpu: amd64
@@ -15,10 +13,15 @@ jobs:
           - os: linux
             cpu: amd64
             TEST_LANG: cpp
+        branch: [version-1-2, version-1-4, devel]
         include:
           - target:
               os: linux
             builder: ubuntu-18.04
+            shell: bash
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
 
     name: '${{ matrix.target.os }}-${{ matrix.target.cpu }}-${{ matrix.target.TEST_LANG }} (Nim ${{ matrix.branch }})'
     runs-on: ${{ matrix.builder }}
@@ -68,8 +71,7 @@ jobs:
           echo '${{ github.workspace }}/nim/bin' >> $GITHUB_PATH
 
       - name: Run tests
-        shell: bash
-        working-directory: nim-result
-        run: |
+       run: |
+          nim --version
           env TEST_LANG="${{ matrix.target.TEST_LANG }}" nimble test
 

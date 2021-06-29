@@ -13,7 +13,7 @@ jobs:
           - os: linux
             cpu: amd64
             TEST_LANG: cpp
-        branch: [version-1-2, version-1-4, devel]
+        branch: [version-1-2, version-1-4]
         include:
           - target:
               os: linux

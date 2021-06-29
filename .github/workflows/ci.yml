@@ -7,7 +7,7 @@ jobs:
       fail-fast: false
       max-parallel: 20
       matrix:
-        branch: [master]
+        branch: [version-1-2, version-1-4, devel]
         target:
           - os: linux
             cpu: amd64
@@ -20,61 +20,52 @@ jobs:
               os: linux
             builder: ubuntu-18.04
 
-    name: '${{ matrix.target.os }}-${{ matrix.target.cpu }}-${{ matrix.target.TEST_LANG }} (${{ matrix.branch }})'
+    name: '${{ matrix.target.os }}-${{ matrix.target.cpu }}-${{ matrix.target.TEST_LANG }} (Nim ${{ matrix.branch }})'
     runs-on: ${{ matrix.builder }}
     steps:
-      - name: Checkout
+      - name: Git checkout
         uses: actions/checkout@v2
-        with:
-          path: nim-result
-          submodules: false
 
-      - name: Get latest nimbus-build-system commit hash
-        id: versions
+      - name: Derive environment variables
         shell: bash
         run: |
-          getHash() {
-            git ls-remote "https://github.com/$1" "${2:-HEAD}" | cut -f 1
-          }
-          nbsHash=$(getHash status-im/nimbus-build-system)
-          echo "::set-output name=nimbus_build_system::$nbsHash"
-
-      - name: Restore prebuilt Nim from cache
-        id: nim-cache
-        uses: actions/cache@v2
-        with:
-          path: nim
-          key: 'nim-${{ matrix.target.os }}-${{ matrix.target.cpu }}-${{ steps.versions.outputs.nimbus_build_system }}'
-
-      - name: Build Nim and associated tools
-        if: steps.nim-cache.outputs.cache-hit != 'true'
-        shell: bash
-        run: |
-          curl -O -L -s -S https://raw.githubusercontent.com/status-im/nimbus-build-system/master/scripts/build_nim.sh
           if [[ '${{ matrix.target.cpu }}' == 'amd64' ]]; then
+            ARCH=64
             PLATFORM=x64
           else
+            ARCH=32
             PLATFORM=x86
           fi
+          echo "ARCH=$ARCH" >> $GITHUB_ENV
+          echo "PLATFORM=$PLATFORM" >> $GITHUB_ENV
+
           if [[ '${{ matrix.target.os }}' == 'windows' ]]; then
             MAKE_CMD="mingw32-make"
           else
             MAKE_CMD="make"
           fi
-          env MAKE="$MAKE_CMD -j2" ARCH_OVERRIDE=$PLATFORM CC=gcc bash build_nim.sh nim csources dist/nimble NimBinaries
+          echo "MAKE_CMD=$MAKE_CMD" >> $GITHUB_ENV
 
-          # clean up to save cache space
-          cd nim
-          rm koch
-          rm -rf nimcache
-          rm -rf csources
-          rm -rf tests
-          rm -rf dist
-          rm -rf .git
+          ncpu=
+          case '${{ runner.os }}' in
+          'Linux')
+            ncpu=$(nproc)
+            ;;
+          'macOS')
+            ncpu=$(sysctl -n hw.ncpu)
+            ;;
+          'Windows')
+            ncpu=$NUMBER_OF_PROCESSORS
+            ;;
+          esac
+          [[ -z "$ncpu" || $ncpu -le 0 ]] && ncpu=1
+          echo "ncpu=$ncpu" >> $GITHUB_ENV
 
-      - name: Setup environment
-        shell: bash
-        run: echo '${{ github.workspace }}/nim/bin' >> $GITHUB_PATH
+      - name: Build the Nim compiler
+        run: |
+          curl -O -L -s -S https://raw.githubusercontent.com/status-im/nimbus-build-system/master/scripts/build_nim.sh
+          env MAKE="${MAKE_CMD} -j${ncpu}" ARCH_OVERRIDE=${PLATFORM} CC=gcc NIM_COMMIT=${{ matrix.branch }} bash build_nim.sh nim csources dist/nimble NimBinaries
+          echo '${{ github.workspace }}/nim/bin' >> $GITHUB_PATH
 
       - name: Run tests
         shell: bash

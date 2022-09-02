@@ -164,7 +164,7 @@ type
     ## `Result[T, cstring]`, `Result[T, enum]` and `Result[T, object]` in
     ## escalating order of complexity.
     ##
-    ## # Result equivaleces with other types
+    ## # Result equivalences with other types
     ##
     ## Result allows tightly controlling the amount of information that a
     ## function gives to the caller:
@@ -333,7 +333,7 @@ func raiseResultError[T, E](self: Result[T, E]) {.noreturn, noinline.} =
     raise toException(self.e)
   elif compiles($self.e):
     raise (ref ResultError[E])(
-      error: self.e, msg: "Trying to access value with err: " & $self.e)
+      error: self.e, msg: $self.e)
   else:
     raise (ref ResultError[E])(msg: "Trying to access value with err", error: self.e)
 
@@ -346,6 +346,7 @@ func raiseResultDefect(m: string) {.noreturn, noinline.} =
   raise (ref ResultDefect)(msg: m)
 
 template assertOk(self: Result) =
+  # Careful - `self` evaluated multiple times, which is fine in all current uses
   if not self.o:
     when self.E isnot void:
       raiseResultDefect("Trying to access value with err Result", self.e)
@@ -560,7 +561,7 @@ func mapCast*[T0, E](
 template `and`*[T0, E, T1](self: Result[T0, E], other: Result[T1, E]): Result[T1, E] =
   ## Evaluate `other` iff self.isOk, else return error
   ## fail-fast - will not evaluate other if a is an error
-  let s = self
+  let s = (self) # TODO avoid copy
   if s.o:
     other
   else:
@@ -581,7 +582,7 @@ template `or`*[T, E0, E1](self: Result[T, E0], other: Result[T, E1]): Result[T, 
   ## func f(): Result[int, SomeEnum] =
   ##   f2() or err(SomeEnum.V) # Collapse errors from other module / function
   ## ```
-  let s = self
+  let s = (self) # TODO avoid copy
   if s.o:
     when type(self) is type(other):
       s
@@ -602,7 +603,9 @@ template orErr*[T, E0, E1](self: Result[T, E0], error: E1): Result[T, E1] =
   ## func f(): Result[int, SomeEnum] =
   ##   f2().orErr(SomeEnum.V) # Collapse errors from other module / function
   ## ```
-  let  s = self
+  ##
+  ## ** Experimental, may be removed **
+  let  s = (self) # TODO avoid copy
   type R = Result[T, E1]
   if s.o:
     when type(self) is R:
@@ -709,7 +712,12 @@ func get*[T: not void, E](self: var Result[T, E]): var T {.inline.} =
   assertOk(self)
   self.v
 
-template `[]`*[T, E](self: Result[T, E]): T =
+template `[]`*[T: not void, E](self: Result[T, E]): T =
+  ## Fetch value of result if set, or raise Defect
+  ## Exception bridge mode: raise given Exception instead
+  self.get()
+
+template `[]`*[E](self: Result[void, E]) =
   ## Fetch value of result if set, or raise Defect
   ## Exception bridge mode: raise given Exception instead
   self.get()
@@ -721,10 +729,13 @@ template `[]`*[T: not void, E](self: var Result[T, E]): var T =
 
 template unsafeGet*[T: not void, E](self: Result[T, E]): T =
   ## Fetch value of result if set, undefined behavior if unset
-  ## See also: Option.unsafeGet
-  assert self.o
-
+  ## See also: `unsafeError`
   self.v
+
+template unsafeGet*[E](self: Result[void, E]) =
+  ## Fetch value of result if set, undefined behavior if unset
+  ## See also: `unsafeError`
+  assert self.o
 
 func expect*[T, E](self: Result[T, E], m: string): T =
   ## Return value of Result, or raise a `Defect` with the given message - use
@@ -779,15 +790,49 @@ func tryError*[T, E](self: Result[T, E]): E {.inline.} =
   when E isnot void:
     self.e
 
+template unsafeError*[T, E: not void](self: Result[T, E]): E =
+  ## Fetch value of result if set, undefined behavior if unset
+  ## See also: `unsafeGet`
+  self.e
+
+template unsafeError*[T](self: Result[T, void]) =
+  ## Fetch value of result if set, undefined behavior if unset
+  ## See also: `unsafeGet`
+  assert not self.o # Emulate field access defect in debug builds
+
 # Alternative spellings for get
 template value*[T, E](self: Result[T, E]): T = self.get()
 template value*[T: not void, E](self: var Result[T, E]): var T = self.get()
 
-template valueOr*[T: not void, E](self: Result[T, E], def: T): T =
-  ## Fetch value of result if set, or supplied default
-  ## default will not be evaluated iff value is set
-  if self.o: self.v
-  else: def
+template valueOr*[T: not void, E](self: Result[T, E], def: untyped): T =
+  ## Fetch value of result if set, or evaluate `def`
+  ## `def` is evaluated lazily, and must be an expression of `T` or exit
+  ## the scope (for example using `return` / `raise`)
+  ##
+  ## Example:
+  ## ```
+  ## let
+  ##   v = Result[int, string].err("hello")
+  ##   x = v.valueOr: 42 # x == 42 now
+  ##   y = v.valueOr: raise (ref ValueError)(msg: "v is an error, gasp!")
+  ## ```
+  let s = (self) # TODO avoid copy
+  if s.o: s.v
+  else:
+    when E isnot void:
+      template error: E {.used, inject.} = s.e
+    def
+
+template errorOr*[T, E: not void](self: Result[T, E], def: untyped): E =
+  ## Fetch error of result if not set, or evaluate `def`
+  ## `def` is evaluated lazily, and must be an expression of `T` or exit
+  ## the scope (for example using `return` / `raise`)
+  let s = (self) # TODO avoid copy
+  if not s.o: s.e
+  else:
+    when T isnot void:
+      template value: T {.used, inject.} = s.v
+    def
 
 func flatten*[T, E](self: Result[Result[T, E], E]): Result[T, E] =
   ## Remove one level of nesting
@@ -836,6 +881,24 @@ func filter*[T](
     self
 
 # Options compatibility
+
+template some*[T](O: type Opt, v: T): Opt[T] =
+  ## Create an `Opt` set to a value
+  ##
+  ## ```
+  ## let o = Opt.some(42)
+  ## assert o.isSome and o.get() == 42
+  ## ```
+  Opt[T].ok(v)
+
+template none*(O: type Opt, T: type): Opt[T] =
+  ## Create an `Opt` set to none
+  ##
+  ## ```
+  ## let o = Opt.none(int)
+  ## assert o.isNone
+  ## ```
+  Opt[T].err()
 
 template isSome*(o: Opt): bool =
   ## Alias for `isOk`
@@ -936,7 +999,16 @@ when isMainModule:
     doAssert rOk.get(100) == rOk.get()
     doAssert rErr.get(100) == 100
 
+    doAssert rOk.get() == rOk.unsafeGet()
+
     doAssert rOk.valueOr(failFast()) == rOk.value()
+    let rErrV = rErr.valueOr:
+      error.len
+    doAssert rErrV == rErr.error.len()
+
+    let rOkV = rOk.errorOr:
+      $value
+    doAssert rOkV == $rOk.get()
 
     # Exceptions -> results
     func raises(): int =
@@ -1100,7 +1172,9 @@ when isMainModule:
     doAssert vErr3.isErr
 
     vOk.get()
+    vOk.unsafeGet()
     vOk.expect("should never fail")
+    vOk[]
 
     # Comparisons
     doAssert (vOk == vOk)
@@ -1174,6 +1248,10 @@ when isMainModule:
     doAssert (oErr == oErr)
     doAssert (oOk != oErr)
 
+    doAssert oOk.get() == oOk.unsafeGet()
+    oErr.error()
+    oErr.unsafeError()
+
     # Mapping
     doAssert oOk.map(proc(x: int): string = $x).get() == $oOk.get()
     oOk.map(proc(x: int) = discard).get()
@@ -1205,6 +1283,9 @@ when isMainModule:
     doAssert oOk.filter(proc(x: int): bool = true) == oOk
     doAssert oOk.filter(proc(x: int): bool = false).isErr()
     doAssert oErr.filter(proc(x: int): bool = true) == oErr
+
+    doAssert Opt.some(42).get() == 42
+    doAssert Opt.none(int).isNone()
 
   block: # `cstring` dangling reference protection
     type CSRes = Result[void, cstring]

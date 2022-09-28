@@ -618,6 +618,28 @@ template orErr*[T, E0, E1](self: Result[T, E0], error: E1): Result[T, E1] =
   else:
     err(R, error)
 
+template orNone*[T, E0](self: Result[T, E0]): Result[T, void] =
+  ## Return `none` iff `not self.isOk`, else return `self`
+  ##
+  ## ```
+  ## func f(): Opt[int] =
+  ##   f2().orNone() # Collapse errors from other module / function
+  ## ```
+  ##
+  ## ** Experimental, may be removed **
+  let  s = (self) # TODO avoid copy
+  type R = Result[T, void]
+  if s.o:
+    when type(self) is R:
+      s
+    else:
+      when T is void:
+        ok(R)
+      else:
+        ok(R, s.v)
+  else:
+    err(R)
+
 
 template catch*(body: typed): Result[type(body), ref CatchableError] =
   ## Catch exceptions for body and store them in the Result
@@ -1046,6 +1068,9 @@ when isMainModule:
 
     doAssert (rErr.orErr(32)).error == 32
     doAssert (rOk.orErr(failFast())).get() == rOk.get()
+
+    doAssert (rErr.orNone()) == Opt.none(R.T)
+    doAssert (rOk.orNone()) == Opt.some(rOk.get())
 
     # string conversion
     doAssert $rOk == "ok(42)"

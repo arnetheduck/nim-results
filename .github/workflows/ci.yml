@@ -1,6 +1,10 @@
 name: CI
 on: [push, pull_request]
 
+concurrency: # Cancel stale PR builds (but not push builds)
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
 jobs:
   build:
     strategy:
@@ -13,11 +17,11 @@ jobs:
           - os: linux
             cpu: amd64
             TEST_LANG: cpp
-        branch: [version-1-2, version-1-4, version-1-6]
+        branch: [version-1-2, version-1-4, version-1-6, version-2-0]
         include:
           - target:
               os: linux
-            builder: ubuntu-18.04
+            builder: ubuntu-20.04
             shell: bash
     defaults:
       run:
@@ -26,8 +30,8 @@ jobs:
     name: '${{ matrix.target.os }}-${{ matrix.target.cpu }}-${{ matrix.target.TEST_LANG }} (Nim ${{ matrix.branch }})'
     runs-on: ${{ matrix.builder }}
     steps:
-      - name: Git checkout
-        uses: actions/checkout@v2
+      - name: Checkout
+        uses: actions/checkout@v3
 
       - name: Derive environment variables
         shell: bash

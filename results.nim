@@ -303,34 +303,40 @@ type
     ## https://github.com/nim-lang/Nim/issues/14318 - generic error raises pragma
 
     # TODO https://github.com/nim-lang/Nim/issues/20699
-    # case o: bool
+    # case oResultPrivate: bool
     # of false:
-    #   e: E
+    #   eResultPrivate: E
     # of true:
-    #   v: T
+    #   vResultPrivate: T
 
+    # TODO ResultPrivate works around
+    # * https://github.com/nim-lang/Nim/issues/3770
+    # * https://github.com/nim-lang/Nim/issues/20900
+    #
+    # Do not use these fields directly in your code, they're not meant to be
+    # public!
     when T is void:
       when E is void:
-        o: bool
+        oResultPrivate*: bool
       else:
-        case o: bool
+        case oResultPrivate*: bool
         of false:
-          e: E
+          eResultPrivate*: E
         of true:
           discard
     else:
       when E is void:
-        case o: bool
+        case oResultPrivate*: bool
         of false:
           discard
         of true:
-          v: T
+          vResultPrivate*: T
       else:
-        case o: bool
+        case oResultPrivate*: bool
         of false:
-          e: E
+          eResultPrivate*: E
         of true:
-          v: T
+          vResultPrivate*: T
 
   Opt*[T] = Result[T, void]
 
@@ -340,7 +346,7 @@ func raiseResultOk[T, E](self: Result[T, E]) {.noreturn, noinline.} =
   when T is void:
     raise (ref ResultError[void])(msg: "Trying to access error with value")
   else:
-    raise (ref ResultError[T])(msg: "Trying to access error with value", error: self.v)
+    raise (ref ResultError[T])(msg: "Trying to access error with value", error: self.vResultPrivate)
 
 func raiseResultError[T, E](self: Result[T, E]) {.noreturn, noinline.} =
   # noinline because raising should take as little space as possible at call
@@ -348,18 +354,18 @@ func raiseResultError[T, E](self: Result[T, E]) {.noreturn, noinline.} =
   mixin toException
 
   when E is ref Exception:
-    if self.e.isNil: # for example Result.default()!
+    if self.eResultPrivate.isNil: # for example Result.default()!
       raise (ref ResultError[void])(msg: "Trying to access value with err (nil)")
-    raise self.e
+    raise self.eResultPrivate
   elif E is void:
     raise (ref ResultError[void])(msg: "Trying to access value with err")
-  elif compiles(toException(self.e)):
-    raise toException(self.e)
-  elif compiles($self.e):
+  elif compiles(toException(self.eResultPrivate)):
+    raise toException(self.eResultPrivate)
+  elif compiles($self.eResultPrivate):
     raise (ref ResultError[E])(
-      error: self.e, msg: $self.e)
+      error: self.eResultPrivate, msg: $self.eResultPrivate)
   else:
-    raise (ref ResultError[E])(msg: "Trying to access value with err", error: self.e)
+    raise (ref ResultError[E])(msg: "Trying to access value with err", error: self.eResultPrivate)
 
 func raiseResultDefect(m: string, v: auto) {.noreturn, noinline.} =
   mixin `$`
@@ -371,21 +377,21 @@ func raiseResultDefect(m: string) {.noreturn, noinline.} =
 
 template assertOk(self: Result) =
   # Careful - `self` evaluated multiple times, which is fine in all current uses
-  if not self.o:
+  if not self.oResultPrivate:
     when self.E isnot void:
-      raiseResultDefect("Trying to access value with err Result", self.e)
+      raiseResultDefect("Trying to access value with err Result", self.eResultPrivate)
     else:
       raiseResultDefect("Trying to access value with err Result")
 
 template ok*[T, E](R: type Result[T, E], x: untyped): R =
   ## Initialize a result with a success and value
   ## Example: `Result[int, string].ok(42)`
-  R(o: true, v: x)
+  R(oResultPrivate: true, vResultPrivate: x)
 
 template ok*[E](R: type Result[void, E]): R =
   ## Initialize a result with a success and value
   ## Example: `Result[void, string].ok()`
-  R(o: true)
+  R(oResultPrivate: true)
 
 template ok*[T: not void, E](self: var Result[T, E], x: untyped) =
   ## Set the result to success and update value
@@ -400,18 +406,18 @@ template ok*[E](self: var Result[void, E]) =
 template err*[T, E](R: type Result[T, E], x: untyped): R =
   ## Initialize the result to an error
   ## Example: `Result[int, string].err("uh-oh")`
-  R(o: false, e: x)
+  R(oResultPrivate: false, eResultPrivate: x)
 
 template err*[T](R: type Result[T, cstring], x: string): R =
   ## Initialize the result to an error
   ## Example: `Result[int, string].err("uh-oh")`
   const s = x # avoid dangling cstring pointers
-  R(o: false, e: cstring(s))
+  R(oResultPrivate: false, eResultPrivate: cstring(s))
 
 template err*[T](R: type Result[T, void]): R =
   ## Initialize the result to an error
   ## Example: `Result[int, void].err()`
-  R(o: false)
+  R(oResultPrivate: false)
 
 template err*[T, E](self: var Result[T, E], x: untyped) =
   ## Set the result as an error
@@ -433,8 +439,8 @@ template ok*(): auto = ok(typeof(result))
 template err*(v: auto): auto = err(typeof(result), v)
 template err*(): auto = err(typeof(result))
 
-template isOk*(self: Result): bool = self.o
-template isErr*(self: Result): bool = not self.o
+template isOk*(self: Result): bool = self.oResultPrivate
+template isErr*(self: Result): bool = not self.oResultPrivate
 
 when not defined(nimHasEffectsOfs):
   template effectsOf(f: untyped) {.pragma.}
@@ -448,13 +454,13 @@ func map*[T0, E, T1](
   ## let r = Result[int, cstring).ok(42)
   ## assert r.map(proc (v: int): int = $v).get() == "42"
   ## ```
-  if self.o:
-    result.ok(f(self.v))
+  if self.oResultPrivate:
+    result.ok(f(self.vResultPrivate))
   else:
     when E is void:
       result.err()
     else:
-      result.err(self.e)
+      result.err(self.eResultPrivate)
 
 func map*[T, E](
     self: Result[T, E], f: proc(x: T)):
@@ -465,81 +471,81 @@ func map*[T, E](
   ## let r = Result[int, cstring).ok(42)
   ## assert r.map(proc (v: int): int = $v).get() == "42"
   ## ```
-  if self.o:
-    f(self.v)
+  if self.oResultPrivate:
+    f(self.vResultPrivate)
     result.ok()
   else:
     when E is void:
       result.err()
     else:
-      result.err(self.e)
+      result.err(self.eResultPrivate)
 
 func map*[E, T1](
     self: Result[void, E], f: proc(): T1):
     Result[T1, E] {.inline, effectsOf: f.} =
   ## Transform value using f, or return error
-  if self.o:
+  if self.oResultPrivate:
     result.ok(f())
   else:
     when E is void:
       result.err()
     else:
-      result.err(self.e)
+      result.err(self.eResultPrivate)
 
 func map*[E](
     self: Result[void, E], f: proc()):
     Result[void, E] {.inline, effectsOf: f.} =
   ## Call f if value is
-  if self.o:
+  if self.oResultPrivate:
     f()
     result.ok()
   else:
     when E is void:
       result.err()
     else:
-      result.err(self.e)
+      result.err(self.eResultPrivate)
 
 func flatMap*[T0, E, T1](
     self: Result[T0, E], f: proc(x: T0): Result[T1, E]):
     Result[T1, E] {.inline, effectsOf: f.} =
-  if self.o: f(self.v)
+  if self.oResultPrivate: f(self.vResultPrivate)
   else:
     when E is void:
       Result[T1, void].err()
     else:
-      Result[T1, E].err(self.e)
+      Result[T1, E].err(self.eResultPrivate)
 
 func flatMap*[E, T1](
     self: Result[void, E], f: proc(): Result[T1, E]):
     Result[T1, E] {.inline, effectsOf: f.} =
-  if self.o: f()
+  if self.oResultPrivate: f()
   else:
     when E is void:
       Result[T1, void].err()
     else:
-      Result[T1, E].err(self.e)
+      Result[T1, E].err(self.eResultPrivate)
 
 func mapErr*[T, E0, E1](
     self: Result[T, E0], f: proc(x: E0): E1):
     Result[T, E1] {.inline, effectsOf: f.} =
   ## Transform error using f, or leave untouched
-  if self.o:
+  if self.oResultPrivate:
     when T is void:
       result.ok()
     else:
-      result.ok(self.v)
+      result.ok(self.vResultPrivate)
   else:
-    result.err(f(self.e))
+    result.err(f(self.eResultPrivate))
 
 func mapErr*[T, E1](
     self: Result[T, void], f: proc(): E1):
     Result[T, E1] {.inline, effectsOf: f.} =
   ## Transform error using f, or return value
-  if self.o:
+  if self.oResultPrivate:
     when T is void:
       result.ok()
     else:
-      result.ok(self.v)
+      result.ok(self.vResultPrivate)
   else:
     result.err(f())
 
@@ -547,24 +553,24 @@ func mapErr*[T, E0](
     self: Result[T, E0], f: proc(x: E0)):
     Result[T, void] {.inline, effectsOf: f.} =
   ## Transform error using f, or return value
-  if self.o:
+  if self.oResultPrivate:
     when T is void:
       result.ok()
     else:
-      result.ok(self.v)
+      result.ok(self.vResultPrivate)
   else:
-    f(self.e)
+    f(self.eResultPrivate)
     result.err()
 
 func mapErr*[T](
     self: Result[T, void], f: proc()):
     Result[T, void] {.inline, effectsOf: f.} =
   ## Transform error using f, or return value
-  if self.o:
+  if self.oResultPrivate:
     when T is void:
       result.ok()
     else:
-      result.ok(self.v)
+      result.ok(self.vResultPrivate)
   else:
     f()
     result.err()
@@ -573,33 +579,33 @@ func mapConvert*[T0, E](
     self: Result[T0, E], T1: type): Result[T1, E] {.inline.} =
   ## Convert result value to A using an conversion
   # Would be nice if it was automatic...
-  if self.o:
+  if self.oResultPrivate:
     when T1 is void:
       result.ok()
     else:
-      result.ok(T1(self.v))
+      result.ok(T1(self.vResultPrivate))
   else:
     when E is void:
       result.err()
     else:
-      result.err(self.e)
+      result.err(self.eResultPrivate)
 
 func mapCast*[T0, E](
     self: Result[T0, E], T1: type): Result[T1, E] {.inline.} =
   ## Convert result value to A using a cast
   ## Would be nice with nicer syntax...
-  if self.o: result.ok(cast[T1](self.v))
+  if self.oResultPrivate: result.ok(cast[T1](self.vResultPrivate))
   else:
     when E is void:
       result.err()
     else:
-      result.err(self.e)
+      result.err(self.eResultPrivate)
 
 template `and`*[T0, E, T1](self: Result[T0, E], other: Result[T1, E]): Result[T1, E] =
   ## Evaluate `other` iff self.isOk, else return error
   ## fail-fast - will not evaluate other if a is an error
   let s = (self) # TODO avoid copy
-  if s.o:
+  if s.oResultPrivate:
     other
   else:
     when type(self) is type(other):
@@ -609,7 +615,7 @@ template `and`*[T0, E, T1](self: Result[T0, E], other: Result[T1, E]): Result[T1
       when E is void:
         err(R)
       else:
-        err(R, s.e)
+        err(R, s.eResultPrivate)
 
 template `or`*[T, E0, E1](self: Result[T, E0], other: Result[T, E1]): Result[T, E1] =
   ## Evaluate `other` iff `not self.isOk`, else return `self`
@@ -620,7 +626,7 @@ template `or`*[T, E0, E1](self: Result[T, E0], other: Result[T, E1]): Result[T, 
   ##   f2() or err(SomeEnum.V) # Collapse errors from other module / function
   ## ```
   let s = (self) # TODO avoid copy
-  if s.o:
+  if s.oResultPrivate:
     when type(self) is type(other):
       s
     else:
@@ -628,7 +634,7 @@ template `or`*[T, E0, E1](self: Result[T, E0], other: Result[T, E1]): Result[T, 
       when T is void:
         ok(R)
       else:
-        ok(R, s.v)
+        ok(R, s.vResultPrivate)
   else:
     other
 
@@ -644,14 +650,14 @@ template orErr*[T, E0, E1](self: Result[T, E0], error: E1): Result[T, E1] =
   ## ** Experimental, may be removed **
   let  s = (self) # TODO avoid copy
   type R = Result[T, E1]
-  if s.o:
+  if s.oResultPrivate:
     when type(self) is R:
       s
     else:
       when T is void:
         ok(R)
       else:
-        ok(R, s.v)
+        ok(R, s.vResultPrivate)
   else:
     err(R, error)
 
@@ -666,16 +672,16 @@ template catch*(body: typed): Result[type(body), ref CatchableError] =
 
   try:
     R.ok(body)
-  except CatchableError as e:
-    R.err(e)
+  except CatchableError as eResultPrivate:
+    R.err(eResultPrivate)
 
 template capture*[E: Exception](T: type, someExceptionExpr: ref E): Result[T, ref E] =
   ## Evaluate someExceptionExpr and put the exception into a result, making sure
   ## to capture a call stack at the capture site:
   ##
   ## ```
-  ## let e: Result[void, ValueError] = void.capture((ref ValueError)(msg: "test"))
-  ## echo e.error().getStackTrace()
+  ## let eResultPrivate: Result[void, ValueError] = void.capture((ref ValueError)(msg: "test"))
+  ## echo eResultPrivate.error().getStackTrace()
   ## ```
   type R = Result[T, ref E]
 
@@ -694,28 +700,28 @@ func `==`*[
     T0: not void, E0: not void,
     T1: not void, E1: not void](
       lhs: Result[T0, E0], rhs: Result[T1, E1]): bool {.inline.} =
-  if lhs.o != rhs.o:
+  if lhs.oResultPrivate != rhs.oResultPrivate:
     false
-  elif lhs.o: # and rhs.o implied
-    lhs.v == rhs.v
+  elif lhs.oResultPrivate: # and rhs.oResultPrivate implied
+    lhs.vResultPrivate == rhs.vResultPrivate
   else:
-    lhs.e == rhs.e
+    lhs.eResultPrivate == rhs.eResultPrivate
 
 func `==`*[E0, E1](
     lhs: Result[void, E0], rhs: Result[void, E1]): bool {.inline.} =
-  if lhs.o != rhs.o:
+  if lhs.oResultPrivate != rhs.oResultPrivate:
     false
-  elif lhs.o: # and rhs.o implied
+  elif lhs.oResultPrivate: # and rhs.oResultPrivate implied
     true
   else:
-    lhs.e == rhs.e
+    lhs.eResultPrivate == rhs.eResultPrivate
 
 func `==`*[T0, T1](
     lhs: Result[T0, void], rhs: Result[T1, void]): bool {.inline.} =
-  if lhs.o != rhs.o:
+  if lhs.oResultPrivate != rhs.oResultPrivate:
     false
-  elif lhs.o: # and rhs.o implied
-    lhs.v == rhs.v
+  elif lhs.oResultPrivate: # and rhs.oResultPrivate implied
+    lhs.vResultPrivate == rhs.vResultPrivate
   else:
     true
 
@@ -725,21 +731,21 @@ func get*[T, E](self: Result[T, E]): T {.inline.} =
   ## See also: Option.get
   assertOk(self)
   when T isnot void:
-    self.v
+    self.vResultPrivate
 
 func tryGet*[T, E](self: Result[T, E]): T {.inline.} =
   ## Fetch value of result if set, or raise
   ## When E is an Exception, raise that exception - otherwise, raise a ResultError[E]
   mixin raiseResultError
-  if not self.o: self.raiseResultError()
+  if not self.oResultPrivate: self.raiseResultError()
   when T isnot void:
-    self.v
+    self.vResultPrivate
 
 func get*[T, E](self: Result[T, E], otherwise: T): T {.inline.} =
   ## Fetch value of result if set, or return the value `otherwise`
   ## See `valueOr` for a template version that avoids evaluating `otherwise`
   ## unless necessary
-  if self.o: self.v
+  if self.oResultPrivate: self.vResultPrivate
   else: otherwise
 
 func get*[T: not void, E](self: var Result[T, E]): var T {.inline.} =
@@ -747,7 +753,7 @@ func get*[T: not void, E](self: var Result[T, E]): var T {.inline.} =
   ## Exception bridge mode: raise given Exception instead
   ## See also: Option.get
   assertOk(self)
-  self.v
+  self.vResultPrivate
 
 template `[]`*[T: not void, E](self: Result[T, E]): T =
   ## Fetch value of result if set, or raise Defect
@@ -767,12 +773,12 @@ template `[]`*[T: not void, E](self: var Result[T, E]): var T =
 template unsafeGet*[T: not void, E](self: Result[T, E]): T =
   ## Fetch value of result if set, undefined behavior if unset
   ## See also: `unsafeError`
-  self.v
+  self.vResultPrivate
 
 template unsafeGet*[E](self: Result[void, E]) =
   ## Fetch value of result if set, undefined behavior if unset
   ## See also: `unsafeError`
-  assert self.o
+  assert self.oResultPrivate
 
 func expect*[T, E](self: Result[T, E], m: string): T =
   ## Return value of Result, or raise a `Defect` with the given message - use
@@ -784,58 +790,58 @@ func expect*[T, E](self: Result[T, E], m: string): T =
   ## # Put here a helpful comment why you think this won't fail
   ## echo r.expect("r was just set to ok(42)")
   ## ```
-  if not self.o:
+  if not self.oResultPrivate:
     when E isnot void:
-      raiseResultDefect(m, self.e)
+      raiseResultDefect(m, self.eResultPrivate)
     else:
       raiseResultDefect(m)
   when T isnot void:
-    self.v
+    self.vResultPrivate
 
 func expect*[T: not void, E](self: var Result[T, E], m: string): var T =
-  if not self.o:
+  if not self.oResultPrivate:
     when E isnot void:
-      raiseResultDefect(m, self.e)
+      raiseResultDefect(m, self.eResultPrivate)
     else:
       raiseResultDefect(m)
-  self.v
+  self.vResultPrivate
 
 func `$`*[T, E](self: Result[T, E]): string =
   ## Returns string representation of `self`
-  if self.o:
+  if self.oResultPrivate:
     when T is void: "ok()"
-    else: "ok(" & $self.v & ")"
+    else: "ok(" & $self.vResultPrivate & ")"
   else:
-    when E is void: "err()"
-    else: "err(" & $self.e & ")"
+    when E is void: "none()"
+    else: "err(" & $self.eResultPrivate & ")"
 
 func error*[T, E](self: Result[T, E]): E =
   ## Fetch error of result if set, or raise Defect
-  if self.o:
+  if self.oResultPrivate:
     when T isnot void:
-      raiseResultDefect("Trying to access error when value is set", self.v)
+      raiseResultDefect("Trying to access error when value is set", self.vResultPrivate)
     else:
       raiseResultDefect("Trying to access error when value is set")
   when E isnot void:
-    self.e
+    self.eResultPrivate
 
 func tryError*[T, E](self: Result[T, E]): E {.inline.} =
   ## Fetch error of result if set, or raise
   ## Raises a ResultError[T]
   mixin raiseResultOk
-  if self.o: self.raiseResultOk()
+  if self.oResultPrivate: self.raiseResultOk()
   when E isnot void:
-    self.e
+    self.eResultPrivate
 
 template unsafeError*[T, E: not void](self: Result[T, E]): E =
   ## Fetch value of result if set, undefined behavior if unset
   ## See also: `unsafeGet`
-  self.e
+  self.eResultPrivate
 
 template unsafeError*[T](self: Result[T, void]) =
   ## Fetch value of result if set, undefined behavior if unset
   ## See also: `unsafeGet`
-  assert not self.o # Emulate field access defect in debug builds
+  assert not self.oResultPrivate # Emulate field access defect in debug builds
 
 # Alternative spellings for get
 template value*[T, E](self: Result[T, E]): T = self.get()
@@ -852,12 +858,23 @@ template valueOr*[T: not void, E](self: Result[T, E], def: untyped): T =
   ##   v = Result[int, string].err("hello")
   ##   x = v.valueOr: 42 # x == 42 now
   ##   y = v.valueOr: raise (ref ValueError)(msg: "v is an error, gasp!")
+  ##   # experimental: direct error access using an unqualified `error` symbol
+  ##   z = v.valueOr: raise (ref ValueError)(msg: error)
   ## ```
+  ##
+  ## `error` access:
+  ##
+  ## TODO experimental, might change in the future
+  ##
+  ## The template contains a shortcut for accessing the error of the result,
+  ## without specifying the error - it can only be used outside of generic code,
+  ## see https://github.com/status-im/nim-stew/issues/161#issuecomment-1397121386
+  ##
   let s = (self) # TODO avoid copy
-  if s.o: s.v
+  if s.oResultPrivate: s.vResultPrivate
   else:
     when E isnot void:
-      template error: E {.used, inject.} = s.e
+      template error: E {.used, inject.} = s.eResultPrivate
     def
 
 template errorOr*[T, E: not void](self: Result[T, E], def: untyped): E =
@@ -865,16 +882,16 @@ template errorOr*[T, E: not void](self: Result[T, E], def: untyped): E =
   ## `def` is evaluated lazily, and must be an expression of `T` or exit
   ## the scope (for example using `return` / `raise`)
   let s = (self) # TODO avoid copy
-  if not s.o: s.e
+  if not s.oResultPrivate: s.eResultPrivate
   else:
     when T isnot void:
-      template value: T {.used, inject.} = s.v
+      template value: T {.used, inject.} = s.vResultPrivate
     def
 
 func flatten*[T, E](self: Result[Result[T, E], E]): Result[T, E] =
   ## Remove one level of nesting
-  if self.o:
-    self.v
+  if self.oResultPrivate:
+    self.vResultPrivate
   else:
     when E is void:
       err(Result[T, E])
@@ -888,8 +905,8 @@ func filter*[T, E](
   ## Apply `callback` to the `self`, iff `self` is not an error. If `callback`
   ## returns an error, return that error, else return `self`
 
-  if self.o:
-    callback(self.v) and self
+  if self.oResultPrivate:
+    callback(self.vResultPrivate) and self
   else:
     self
 
@@ -900,7 +917,7 @@ func filter*[E](
   ## Apply `callback` to the `self`, iff `self` is not an error. If `callback`
   ## returns an error, return that error, else return `self`
 
-  if self.o:
+  if self.oResultPrivate:
     callback() and self
   else:
     self
@@ -912,8 +929,8 @@ func filter*[T](
   ## Apply `callback` to the `self`, iff `self` is not an error. If `callback`
   ## returns an error, return that error, else return `self`
 
-  if self.o:
-    if callback(self.v):
+  if self.oResultPrivate:
+    if callback(self.vResultPrivate):
       self
     else:
       Result[T, void].err()
@@ -926,8 +943,8 @@ template some*[T](O: type Opt, v: T): Opt[T] =
   ## Create an `Opt` set to a value
   ##
   ## ```
-  ## let o = Opt.some(42)
-  ## assert o.isSome and o.get() == 42
+  ## let oResultPrivate = Opt.some(42)
+  ## assert oResultPrivate.isSome and oResultPrivate.get() == 42
   ## ```
   Opt[T].ok(v)
 
@@ -935,18 +952,18 @@ template none*(O: type Opt, T: type): Opt[T] =
   ## Create an `Opt` set to none
   ##
   ## ```
-  ## let o = Opt.none(int)
-  ## assert o.isNone
+  ## let oResultPrivate = Opt.none(int)
+  ## assert oResultPrivate.isNone
   ## ```
   Opt[T].err()
 
-template isSome*(o: Opt): bool =
+template isSome*(oResultPrivate: Opt): bool =
   ## Alias for `isOk`
-  isOk o
+  isOk oResultPrivate
 
-template isNone*(o: Opt): bool =
+template isNone*(oResultPrivate: Opt): bool =
   ## Alias of `isErr`
-  isErr o
+  isErr oResultPrivate
 
 # Syntactic convenience
 
@@ -962,17 +979,17 @@ template `?`*[T, E](self: Result[T, E]): auto =
   # TODO the v copy is here to prevent multiple evaluations of self - could
   #      probably avoid it with some fancy macro magic..
   let v = (self)
-  if not v.o:
+  if not v.oResultPrivate:
     when typeof(result) is typeof(v):
       return v
     else:
       when E is void:
         return err(typeof(result))
       else:
-        return err(typeof(result), v.e)
+        return err(typeof(result), v.eResultPrivate)
 
   when not(T is void):
-    v.v
+    v.vResultPrivate
 
 when isMainModule:
   type R = Result[int, string]
@@ -1303,7 +1320,7 @@ when isMainModule:
 
     # string conversion
     doAssert $oOk == "ok(42)"
-    doAssert $oErr == "err()"
+    doAssert $oErr == "none()"
 
     proc optQuestion(): OptInt =
       let v = ? oOk

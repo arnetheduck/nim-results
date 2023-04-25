@@ -7,7 +7,7 @@ Result type that can hold either a value or an error, but not both
 Add the following to your `.nimble` file:
 
 ```
-requires "result"
+requires "results"
 ```
 
 or just drop the file in your project!

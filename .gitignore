@@ -1,2 +1,6 @@
 nimcache/
-result
+results
+benchmarks/benchmark
+tests/test_results
+tests/test_results2
+

@@ -1,5 +1,5 @@
 import math, times
-import ../result
+import ../results
 
 type
   Test1Type* = int

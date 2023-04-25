@@ -1,14 +1,14 @@
 # Package
 
-version       = "0.3.0"
+version       = "0.4.0"
 author        = "Jacek Sieka"
 description   = "Friendly, exception-free value-or-error returns, similar to Option[T]"
 license       = "MIT"
-skipDirs      = @["benchmarks"]
-installFiles  = @["result.nim", "results.nim"]
+skipDirs      = @["benchmarks", "tests"]
+installFiles  = @["results.nim"]
 # Dependencies
 
-requires "nim >= 1.0.0"
+requires "nim >= 1.2"
 
 proc test(env, path: string) =
   # Compilation language is controlled by TEST_LANG
@@ -19,4 +19,8 @@ proc test(env, path: string) =
     " -r " & path
 
 task test, "Runs the test suite":
-  test "", "results.nim"
+  for f in ["test_results.nim", "test_results2.nim"]:
+    test "", "tests/" & f
+
+task bench, "Run benchmark":
+  test "-d:release", "benchmarks/benchmark.nim"

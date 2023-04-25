@@ -847,10 +847,66 @@ template unsafeError*[T](self: Result[T, void]) =
 template value*[T, E](self: Result[T, E]): T = self.get()
 template value*[T: not void, E](self: var Result[T, E]): var T = self.get()
 
+template isOkOr*[T, E](self: Result[T, E], body: untyped) =
+  ## Evaluate `body` iff result has been assigned an error
+  ## `body` is evaluated lazily.
+  ##
+  ## Example:
+  ## ```
+  ## let
+  ##   v = Result[int, string].err("hello")
+  ##   x = v.isOkOr: echo "not ok"
+  ##   # experimental: direct error access using an unqualified `error` symbol
+  ##   z = v.isOkOr: echo error
+  ## ```
+  ##
+  ## `error` access:
+  ##
+  ## TODO experimental, might change in the future
+  ##
+  ## The template contains a shortcut for accessing the error of the result,
+  ## it can only be used outside of generic code,
+  ## see https://github.com/status-im/nim-stew/issues/161#issuecomment-1397121386
+
+  let s = (self) # TODO avoid copy
+  if not s.oResultPrivate:
+    when E isnot void:
+      template error: E {.used, inject.} = s.eResultPrivate
+    body
+
+template isErrOr*[T, E](self: Result[T, E], body: untyped) =
+  ## Evaluate `body` iff result has been assigned a value
+  ## `body` is evaluated lazily.
+  ##
+  ## Example:
+  ## ```
+  ## let
+  ##   v = Result[int, string].err("hello")
+  ##   x = v.isOkOr: echo "not ok"
+  ##   # experimental: direct error access using an unqualified `error` symbol
+  ##   z = v.isOkOr: echo error
+  ## ```
+  ##
+  ## `value` access:
+  ##
+  ## TODO experimental, might change in the future
+  ##
+  ## The template contains a shortcut for accessing the value of the result,
+  ## it can only be used outside of generic code,
+  ## see https://github.com/status-im/nim-stew/issues/161#issuecomment-1397121386
+
+  let s = (self) # TODO avoid copy
+  if s.oResultPrivate:
+    when T isnot void:
+      template value: T {.used, inject.} = s.vResultPrivate
+    body
+
 template valueOr*[T: not void, E](self: Result[T, E], def: untyped): T =
   ## Fetch value of result if set, or evaluate `def`
   ## `def` is evaluated lazily, and must be an expression of `T` or exit
   ## the scope (for example using `return` / `raise`)
+  ##
+  ## See `isOkOr` for a version that works with `Result[void, E]`.
   ##
   ## Example:
   ## ```
@@ -867,11 +923,12 @@ template valueOr*[T: not void, E](self: Result[T, E], def: untyped): T =
   ## TODO experimental, might change in the future
   ##
   ## The template contains a shortcut for accessing the error of the result,
-  ## without specifying the error - it can only be used outside of generic code,
+  ## it can only be used outside of generic code,
   ## see https://github.com/status-im/nim-stew/issues/161#issuecomment-1397121386
   ##
   let s = (self) # TODO avoid copy
-  if s.oResultPrivate: s.vResultPrivate
+  if s.oResultPrivate:
+    s.vResultPrivate
   else:
     when E isnot void:
       template error: E {.used, inject.} = s.eResultPrivate
@@ -881,8 +938,11 @@ template errorOr*[T, E: not void](self: Result[T, E], def: untyped): E =
   ## Fetch error of result if not set, or evaluate `def`
   ## `def` is evaluated lazily, and must be an expression of `T` or exit
   ## the scope (for example using `return` / `raise`)
+  ##
+  ## See `isErrOr` for a version that works with `Result[T, void]`.
   let s = (self) # TODO avoid copy
-  if not s.oResultPrivate: s.eResultPrivate
+  if not s.oResultPrivate:
+    s.eResultPrivate
   else:
     when T isnot void:
       template value: T {.used, inject.} = s.vResultPrivate
@@ -1057,6 +1117,15 @@ when isMainModule:
     doAssert rErr.get(100) == 100
 
     doAssert rOk.get() == rOk.unsafeGet()
+
+    rOk.isOkOr: raiseAssert "should not end up in here"
+    rErr.isErrOr: raiseAssert "should not end up in here"
+
+    rErr.isOkOr:
+      doAssert error == rErr.error()
+
+    rOk.isErrOr:
+      doAssert value == rOk.value()
 
     doAssert rOk.valueOr(failFast()) == rOk.value()
     let rErrV = rErr.valueOr:

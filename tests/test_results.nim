@@ -149,6 +149,12 @@ block:
   # Expectations
   doAssert rOk.expect("testOk never fails") == 42
 
+  # Conversions to Opt
+  doAssert rOk.optValue() == Opt.some(rOk.get())
+  doAssert rOk.optError().isNone()
+  doAssert rErr.optValue().isNone()
+  doAssert rErr.optError() == Opt.some(rErr.error())
+
   # Question mark operator
   func testQn(): Result[int, string] =
     let x = ?works() - ?works()
@@ -182,6 +188,37 @@ block:
   doAssert rOk.filter(proc(x: int): auto = Result[void, string].ok()) == rOk
   doAssert rOk.filter(proc(x: int): auto = Result[void, string].err("filter")).error == "filter"
   doAssert rErr.filter(proc(x: int): auto = Result[void, string].err("filter")) == rErr
+
+  # Collections
+  block:
+    var i = 0
+    for v in rOk.values:
+      doAssert v == rOk.value()
+      i += 1
+    doAssert i == 1
+
+    for v in rOk.errors:
+      raiseAssert "not an error"
+
+    doAssert rOk.containsValue(rOk.value())
+    doAssert not rOk.containsValue(rOk.value() + 1)
+
+    doAssert not rOk.containsError("test")
+
+  block:
+    var i = 0
+    for v in rErr.values:
+      raiseAssert "not a value"
+
+    for v in rErr.errors:
+      doAssert v == rErr.error()
+      i += 1
+    doAssert i == 1
+
+  doAssert rErr.containsError(rErr.error())
+  doAssert not rErr.containsError(rErr.error() & "X")
+
+  doAssert not rErr.containsValue(42)
 
 # Exception conversions - toException must not be inside a block
 type
@@ -361,6 +398,21 @@ block: # Result[T, void] aka `Opt`
   doAssert Opt.some(42).get() == 42
   doAssert Opt.none(int).isNone()
 
+  # Construct Result from Opt
+  doAssert oOk.orErr("error").value() == oOk.get()
+  doAssert oErr.orErr("error").error() == "error"
+
+  # Collections
+  block:
+    var i = 0
+    for v in oOk:
+      doAssert v == oOk.value()
+      i += 1
+    doAssert i == 1
+
+    doAssert oOk.value() in oOk
+    doAssert oOk.value() + 1 notin oOk
+
 block: # `cstring` dangling reference protection
   type CSRes = Result[void, cstring]
 
@@ -420,3 +472,13 @@ block: # Constants
   proc checkIt(v: WithOpt) =
     doAssert v.opt.isNone()
   checkIt(noneWithOpt)
+
+  block: # TODO https://github.com/nim-lang/Nim/issues/22049
+    var v: Result[(seq[int], seq[int]), int]
+    v.ok((@[1], @[2]))
+    let (a, b) = v.get()
+    doAssert a == [1] and b == [2]
+    let (c, d) = v.tryGet()
+    doAssert c == [1] and d == [2]
+    let (e, f) = v.unsafeGet()
+    doAssert e == [1] and f == [2]

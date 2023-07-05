@@ -85,19 +85,34 @@ block:
   doAssert rOkV == $rOk.get()
 
   # Exceptions -> results
-  func raises(): int =
-    raise (ref CatchableError)(msg: "hello")
+  block:
+    func raises(): int =
+      raise (ref CatchableError)(msg: "hello")
+    func raisesVoid() =
+      raise (ref CatchableError)(msg: "hello")
 
-  let c = catch:
-    raises()
-  doAssert c.isErr
+    let c = catch:
+      raises()
+    doAssert c.isErr
+
+    when (NimMajor, NimMinor) >= (1, 6):
+      # Earlier versions complain about the type of the raisesVoid expression
+      let d = catch:
+        raisesVoid()
+      doAssert d.isErr
 
   # De-reference
+  when (NimMajor, NimMinor) >= (1, 6):
+    {.warning[BareExcept]:off.}
+
   try:
     echo rErr[]
     doAssert false
   except:
     discard
+
+  when (NimMajor, NimMinor) >= (1, 6):
+    {.warning[BareExcept]:on.}
 
   # Comparisons
   doAssert (rOk == rOk)
@@ -120,6 +135,9 @@ block:
 
   doAssert (rErr.orErr(32)).error == 32
   doAssert (rOk.orErr(failFast())).get() == rOk.get()
+
+  doAssert rErr.mapConvertErr(cstring).error() == cstring(rErr.error())
+  doAssert rErr.mapCastErr(seq[byte]).error() == cast[seq[byte]](rErr.error())
 
   # string conversion
   doAssert $rOk == "ok(42)"
@@ -482,3 +500,29 @@ block: # Constants
     doAssert c == [1] and d == [2]
     let (e, f) = v.unsafeGet()
     doAssert e == [1] and f == [2]
+
+block:
+  # withAssertOk evaluated as statement instead of expr
+  # https://github.com/nim-lang/Nim/issues/22216
+  func bug(): Result[uint16, string] =
+    ok(1234)
+
+  const
+    x = bug()
+    y = x.value()
+
+  doAssert y == 1234
+
+  when (NimMajor, NimMinor) >= (1,6):
+    # pre 1.6 nim vm have worse bug
+    static:
+      var z = bug()
+      z.value() = 15
+      let w = z.get()
+      doAssert w == 15
+  
+  let
+    xx = bug()
+    yy = x.value()
+
+  doAssert yy == 1234

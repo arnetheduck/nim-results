@@ -982,7 +982,20 @@ when resultsGenericBindingWorkaround:
           return true
       false
 
+  proc containsIdent(n: NimNode, what: string): bool =
+    if n.kind == nnkIdent and n.eqIdent(what):
+      true
+    else:
+      for child in n:
+        if containsIdent(child, what):
+          return true
+
+      false
+
   proc replace(n: NimNode, what: string, with: NimNode): NimNode =
+    if not containsIdent(n, what): # Avoid lots of node copies if not needed
+      return n
+
     if n.eqIdent(what):
       result = with
     else:
@@ -997,20 +1010,12 @@ when resultsGenericBindingWorkaround:
           for i in 1..<n.len:
             result.add replace(n[i], what, with)
       of nnkExprEqExpr:
-        # "error = xxx" - assignment to error not supported
+        # "error = xxx" - function call with named parameters and other weird stuff
         result = copyNimNode(n)
         result.add n[0]
         for i in 1..<n.len:
           result.add replace(n[i], what, with)
-      of nnkLetSection, nnkVarSection:
-        # Prevent `let error = error` for now
-        for child in n:
-          assert child.kind == nnkIdentDefs
-          if child[0].eqIdent(what):
-            # Naming the symbol the same way requires lots of magic here - just
-            # say no
-            error("Shadowing variable declarations of `" & what & "` not supported", child[0])
-
+      of nnkLetSection, nnkVarSection, nnkFormalParams:
         result = copyNimNode(n)
         for i in 0..<n.len:
           result.add replace(n[i], what, with)
@@ -1020,6 +1025,13 @@ when resultsGenericBindingWorkaround:
         result.add(replace(n[0], what, with))
         result.add(n[1])
       else:
+        if  (n.kind == nnkForStmt and (
+              n[0].eqIdent(what) or (n.len == 4 and n[1].eqIdent(what))) or
+            (n.kind == nnkIdentDefs and n[0].eqIdent(what))):
+          # Naming the symbol the same way requires lots of magic here - just
+          # say no
+          error("Shadowing variable declarations of `" & what & "` not supported", n[0])
+
         result = copyNimNode(n)
         for i in 0..<n.len:
           result.add replace(n[i], what, with)

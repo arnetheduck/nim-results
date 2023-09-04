@@ -340,6 +340,20 @@ type
 
   Opt*[T] = Result[T, void]
 
+const
+  resultsGenericBindingWorkaround* {.booldefine.} = true
+    ## Enable a workaround for the template injection problem in the issue
+    ## linked below where injected templates get bound differently depending
+    ## on whether we're in a generic context or not - this leads to surprising
+    ## errors where random symbols from outer scopes get bound to the name
+    ## instead of the intended value.
+    ## However, this ugly hack might introduce more damage than it's worth so
+    ## it can be disabled at compile-time - hopefully an upstream solution
+    ## can be found.
+    # TODO https://github.com/nim-lang/Nim/issues/22605
+    # TODO https://github.com/arnetheduck/nim-results/issues/34
+
+
 func raiseResultOk[T, E](self: Result[T, E]) {.noreturn, noinline.} =
   # noinline because raising should take as little space as possible at call
   # site
@@ -955,6 +969,67 @@ func get*[T, E](self: Result[T, E], otherwise: T): T {.inline.} =
   of false:
     otherwise
 
+when resultsGenericBindingWorkaround:
+  import macros
+
+  proc containsHack(n: NimNode): bool =
+    if n.len == 0:
+      n.eqIdent("isOkOr") or n.eqIdent("isErrOr") or n.eqIdent("valueOr") or
+        n.eqIdent("errorOr")
+    else:
+      for child in n:
+        if containsHack(child):
+          return true
+      false
+
+  proc replace(n: NimNode, what: string, with: NimNode): NimNode =
+    if n.eqIdent(what):
+      result = with
+    else:
+      case n.kind
+      of nnkCallKinds:
+        # `error(...)` - replace args but not function name
+        if n[0].containsHack():
+          result = n
+        else:
+          result = copyNimNode(n)
+          result.add n[0]
+          for i in 1..<n.len:
+            result.add replace(n[i], what, with)
+      of nnkExprEqExpr:
+        # "error = xxx" - assignment to error not supported
+        result = copyNimNode(n)
+        result.add n[0]
+        for i in 1..<n.len:
+          result.add replace(n[i], what, with)
+      of nnkLetSection, nnkVarSection:
+        # Prevent `let error = error` for now
+        for child in n:
+          assert child.kind == nnkIdentDefs
+          if child[0].eqIdent(what):
+            # Naming the symbol the same way requires lots of magic here - just
+            # say no
+            error("Shadowing variable declarations of `" & what & "` not supported", child[0])
+
+        result = copyNimNode(n)
+        for i in 0..<n.len:
+          result.add replace(n[i], what, with)
+      of nnkDotExpr:
+        # Ignore rhs in "abc.error"
+        result = copyNimNode(n)
+        result.add(replace(n[0], what, with))
+        result.add(n[1])
+      else:
+        result = copyNimNode(n)
+        for i in 0..<n.len:
+          result.add replace(n[i], what, with)
+
+  macro repaceHack(body, what, with: untyped): untyped =
+    # This hack replaces the `what` identifier with `with` except where
+    # this replacing is not expected - this is an approximation of the intent
+    # of injecting a template and likely doesn't cover all applicable cases
+    replace(body, $what, with)
+
 template isOkOr*[T, E](self: Result[T, E], body: untyped) =
   ## Evaluate `body` iff result has been assigned an error
   ## `body` is evaluated lazily.
@@ -980,8 +1055,14 @@ template isOkOr*[T, E](self: Result[T, E], body: untyped) =
   case s.oResultPrivate
   of false:
     when E isnot void:
-      template error: E {.used, inject.} = s.eResultPrivate
-    body
+      when resultsGenericBindingWorkaround:
+        template error: E {.used, gensym.} = s.eResultPrivate
+        repaceHack(body, "error", error)
+      else:
+        template error: E {.used, inject.} = s.eResultPrivate
+        body
+    else:
+      body
   of true:
     discard
 
@@ -992,10 +1073,10 @@ template isErrOr*[T, E](self: Result[T, E], body: untyped) =
   ## Example:
   ## ```
   ## let
-  ##   v = Result[int, string].err("hello")
-  ##   x = v.isOkOr: echo "not ok"
-  ##   # experimental: direct error access using an unqualified `error` symbol
-  ##   z = v.isOkOr: echo error
+  ##   v = Result[int, string].ok(42)
+  ##   x = v.isErrOr: echo "not err"
+  ##   # experimental: direct value access using an unqualified `value` symbol
+  ##   z = v.isErrOr: echo value
   ## ```
   ##
   ## `value` access:
@@ -1010,8 +1091,14 @@ template isErrOr*[T, E](self: Result[T, E], body: untyped) =
   case s.oResultPrivate
   of true:
     when T isnot void:
-      template value: T {.used, inject.} = s.vResultPrivate
-    body
+      when resultsGenericBindingWorkaround:
+        template value: T {.used, gensym.} = s.vResultPrivate
+        repaceHack(body, "value", value)
+      else:
+        template value: T {.used, inject.} = s.vResultPrivate
+        body
+    else:
+      body
   of false:
     discard
 
@@ -1046,8 +1133,14 @@ template valueOr*[T: not void, E](self: Result[T, E], def: untyped): T =
     s.vResultPrivate
   of false:
     when E isnot void:
-      template error: E {.used, inject.} = s.eResultPrivate
-    def
+      when resultsGenericBindingWorkaround:
+        template error: E {.used, gensym.} = s.eResultPrivate
+        repaceHack(def, "error", error)
+      else:
+        template error: E {.used, inject.} = s.eResultPrivate
+        def
+    else:
+      def
 
 template errorOr*[T; E: not void](self: Result[T, E], def: untyped): E =
   ## Fetch error of result if not set, or evaluate `def`
@@ -1061,8 +1154,14 @@ template errorOr*[T; E: not void](self: Result[T, E], def: untyped): E =
     s.eResultPrivate
   of true:
     when T isnot void:
-      template value: T {.used, inject.} = s.vResultPrivate
-    def
+      when resultsGenericBindingWorkaround:
+        template value: T {.used, gensym.} = s.vResultPrivate
+        repaceHack(def, "value", value)
+      else:
+        template value: T {.used, inject.} = s.vResultPrivate
+        def
+    else:
+      def
 
 func flatten*[T, E](self: Result[Result[T, E], E]): Result[T, E] =
   ## Remove one level of nesting

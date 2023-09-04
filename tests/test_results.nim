@@ -6,12 +6,12 @@ type R = Result[int, string]
 
 block:
   func works(): R = R.ok(42)
-  func works2(): R = result.ok(42)
-  func works3(): R = ok(42)
+  func works2(): R = result.ok(43)
+  func works3(): R = ok(44)
 
   func fails(): R = R.err("dummy")
-  func fails2(): R = result.err("dummy")
-  func fails3(): R = err("dummy")
+  func fails2(): R = result.err("dummy2")
+  func fails3(): R = err("dummy3")
 
   let
     rOk = works()
@@ -77,8 +77,14 @@ block:
 
   doAssert rOk.valueOr(failFast()) == rOk.value()
   let rErrV = rErr.valueOr:
-    error.len
-  doAssert rErrV == rErr.error.len()
+    ord(error[0])
+  doAssert rErrV == ord(rErr.error[0])
+
+  block: # nested valueOr binds to the inner error
+    let rInnerV = rErr.valueOr:
+      rErr2.valueOr:
+        ord(error[^1])
+    doAssert rInnerV == ord(rErr2.error[^1])
 
   let rOkV = rOk.errorOr:
     $value
@@ -520,9 +526,25 @@ block:
       z.value() = 15
       let w = z.get()
       doAssert w == 15
-  
+
   let
     xx = bug()
     yy = x.value()
 
   doAssert yy == 1234
+
+block:
+  type Breaking = enum
+    error # Same name as injected template
+    value
+
+  proc genericFunc(T: type): int =
+    let rErr = Result[int, string].err("abc")
+    rErr.valueOr:
+      when resultsGenericBindingWorkaround:
+        doAssert $error == $rErr.error()
+      else:
+        doAssert $error == $Breaking.error
+      33
+
+  discard genericFunc(int)

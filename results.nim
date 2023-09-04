@@ -983,7 +983,7 @@ when resultsGenericBindingWorkaround:
       false
 
   proc containsIdent(n: NimNode, what: string): bool =
-    if n.kind == nnkIdent and n.eqIdent(what):
+    if n.eqIdent(what):
       true
     else:
       for child in n:

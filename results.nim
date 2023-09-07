@@ -1036,7 +1036,7 @@ when resultsGenericBindingWorkaround:
         for i in 0..<n.len:
           result.add replace(n[i], what, with)
 
-  macro repaceHack(body, what, with: untyped): untyped =
+  macro replaceHack(body, what, with: untyped): untyped =
     # This hack replaces the `what` identifier with `with` except where
     # this replacing is not expected - this is an approximation of the intent
     # of injecting a template and likely doesn't cover all applicable cases
@@ -1069,7 +1069,7 @@ template isOkOr*[T, E](self: Result[T, E], body: untyped) =
     when E isnot void:
       when resultsGenericBindingWorkaround:
         template error: E {.used, gensym.} = s.eResultPrivate
-        repaceHack(body, "error", error)
+        replaceHack(body, "error", error)
       else:
         template error: E {.used, inject.} = s.eResultPrivate
         body
@@ -1105,7 +1105,7 @@ template isErrOr*[T, E](self: Result[T, E], body: untyped) =
     when T isnot void:
       when resultsGenericBindingWorkaround:
         template value: T {.used, gensym.} = s.vResultPrivate
-        repaceHack(body, "value", value)
+        replaceHack(body, "value", value)
       else:
         template value: T {.used, inject.} = s.vResultPrivate
         body
@@ -1147,7 +1147,7 @@ template valueOr*[T: not void, E](self: Result[T, E], def: untyped): T =
     when E isnot void:
       when resultsGenericBindingWorkaround:
         template error: E {.used, gensym.} = s.eResultPrivate
-        repaceHack(def, "error", error)
+        replaceHack(def, "error", error)
       else:
         template error: E {.used, inject.} = s.eResultPrivate
         def
@@ -1168,7 +1168,7 @@ template errorOr*[T; E: not void](self: Result[T, E], def: untyped): E =
     when T isnot void:
       when resultsGenericBindingWorkaround:
         template value: T {.used, gensym.} = s.vResultPrivate
-        repaceHack(def, "value", value)
+        replaceHack(def, "value", value)
       else:
         template value: T {.used, inject.} = s.vResultPrivate
         def

@@ -1192,13 +1192,21 @@ template `?`*[T, E](self: Result[T, E]): auto =
   let v = (self)
   case v.oResultPrivate
   of false:
+    # Instead of `return xxx` we use `result = xxx; return` which avoids the
+    # need to rewrite `return` in macros that take over the `result` symbol and
+    # its associated control flow - this hack increases compatibility with
+    # chronos' async - see https://github.com/status-im/nim-stew/issues/37 for
+    # more in-depth discussion.
     when typeof(result) is typeof(v):
-      return v
+      result = v
+      return
     else:
       when E is void:
-        return err(typeof(result))
+        result = err(typeof(result))
+        return
       else:
-        return err(typeof(result), v.eResultPrivate)
+        result = err(typeof(result), v.eResultPrivate)
+        return
   of true:
     when not (T is void):
       v.vResultPrivate

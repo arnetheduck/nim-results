@@ -29,7 +29,9 @@ type
     f3*: Test1Type
 
   ErrorCode* = enum
-    Fail1, Fail2, Fail3
+    Fail1
+    Fail2
+    Fail3
 
   Result1* = Result[Test1Type, ErrorCode]
   Result2* = Result[Test2Type, ErrorCode]
@@ -52,18 +54,13 @@ proc getValue2(): Test2Type =
   result = Test2Type(f1: 0xCAFE, f2: 0xCAFE, f3: 0xCAFE)
 
 proc getResult3(): Result3 =
-  result.ok(Test3Type(
-    f1: 0xCAFE,
-    f2: 0xCAFE,
-    f3: Test2Type(f1: 0xCAFE, f2: 0xCAFE, f3: 0xCAFE)
-  ))
+  result.ok(
+    Test3Type(f1: 0xCAFE, f2: 0xCAFE, f3: Test2Type(f1: 0xCAFE, f2: 0xCAFE, f3: 0xCAFE))
+  )
 
 proc getValue3(): Test3Type =
-  result = Test3Type(
-    f1: 0xCAFE,
-    f2: 0xCAFE,
-    f3: Test2Type(f1: 0xCAFE, f2: 0xCAFE, f3: 0xCAFE)
-  )
+  result =
+    Test3Type(f1: 0xCAFE, f2: 0xCAFE, f3: Test2Type(f1: 0xCAFE, f2: 0xCAFE, f3: 0xCAFE))
 
 proc getResult41(): Result4 =
   var res = newSeq[byte](16384)
@@ -230,7 +227,8 @@ when isMainModule:
     echo "  result test = ", $(b2 - a2)
     var d1 = b1 - a1
     var d2 = b2 - a2
-    if d1 == 0: d1 = 0.00000001
+    if d1 == 0:
+      d1 = 0.00000001
     echo "  difference = ", round((float(d2) * 100.00) / float(d1), 2), "%"
 
   block:
@@ -245,7 +243,8 @@ when isMainModule:
     echo "  result test = ", $(b2 - a2)
     var d1 = b1 - a1
     var d2 = b2 - a2
-    if d1 == 0: d1 = 0.00000001
+    if d1 == 0:
+      d1 = 0.00000001
     echo "  difference = ", round((float(d2) * 100.00) / float(d1), 2), "%"
 
   block:
@@ -260,7 +259,8 @@ when isMainModule:
     echo "  result test = ", $(b2 - a2)
     var d1 = b1 - a1
     var d2 = b2 - a2
-    if d1 == 0: d1 = 0.00000001
+    if d1 == 0:
+      d1 = 0.00000001
     echo "  difference = ", round((float(d2) * 100.00) / float(d1), 2), "%"
 
   block:
@@ -275,7 +275,8 @@ when isMainModule:
     echo "  result test = ", $(b2 - a2)
     var d1 = b1 - a1
     var d2 = b2 - a2
-    if d1 == 0: d1 = 0.00000001
+    if d1 == 0:
+      d1 = 0.00000001
     echo "  difference = ", round((float(d2) * 100.00) / float(d1), 2), "%"
 
   block:
@@ -290,7 +291,8 @@ when isMainModule:
     echo "  result test = ", $(b2 - a2)
     var d1 = b1 - a1
     var d2 = b2 - a2
-    if d1 == 0: d1 = 0.00000001
+    if d1 == 0:
+      d1 = 0.00000001
     echo "  difference = ", round((float(d2) * 100.00) / float(d1), 2), "%"
 
   block:
@@ -305,7 +307,8 @@ when isMainModule:
     echo "  result test = ", $(b2 - a2)
     var d1 = b1 - a1
     var d2 = b2 - a2
-    if d1 == 0: d1 = 0.00000001
+    if d1 == 0:
+      d1 = 0.00000001
     echo "  difference = ", round((float(d2) * 100.00) / float(d1), 2), "%"
 
   block:
@@ -320,7 +323,8 @@ when isMainModule:
     echo "  result test = ", $(b2 - a2)
     var d1 = b1 - a1
     var d2 = b2 - a2
-    if d1 == 0: d1 = 0.00000001
+    if d1 == 0:
+      d1 = 0.00000001
     echo "  difference = ", round((float(d2) * 100.00) / float(d1), 2), "%"
 
   block:
@@ -335,7 +339,8 @@ when isMainModule:
     echo "  result test = ", $(b2 - a2)
     var d1 = b1 - a1
     var d2 = b2 - a2
-    if d1 == 0: d1 = 0.00000001
+    if d1 == 0:
+      d1 = 0.00000001
     echo "  difference = ", round((float(d2) * 100.00) / float(d1), 2), "%"
 
   block:
@@ -350,7 +355,8 @@ when isMainModule:
     echo "  result test = ", $(b2 - a2)
     var d1 = b1 - a1
     var d2 = b2 - a2
-    if d1 == 0: d1 = 0.00000001
+    if d1 == 0:
+      d1 = 0.00000001
     echo "  difference = ", round((float(d2) * 100.00) / float(d1), 2), "%"
 
   block:
@@ -365,5 +371,6 @@ when isMainModule:
     echo "  result test = ", $(b2 - a2)
     var d1 = b1 - a1
     var d2 = b2 - a2
-    if d1 == 0: d1 = 0.00000001
+    if d1 == 0:
+      d1 = 0.00000001
     echo "  difference = ", round((float(d2) * 100.00) / float(d1), 2), "%"

@@ -67,12 +67,14 @@ block:
 
   # Exception on access
   doAssert (
-    try: (discard rOk.tryError(); false)
+    try:
+      (discard rOk.tryError(); false)
     except ResultError[int]:
       true
   )
   doAssert (
-    try: (discard rErr.tryGet(); false)
+    try:
+      (discard rErr.tryGet(); false)
     except ResultError[string]:
       true
   )
@@ -380,6 +382,7 @@ block: # Result[void, E]
     proc(): int =
         42
   ).get() == 42
+
   vOk.map(
     proc() =
         discard
@@ -389,6 +392,7 @@ block: # Result[void, E]
     proc(x: int): int =
         10
   ).get()
+
   vOk.mapErr(
     proc(x: int) =
         discard
@@ -481,6 +485,7 @@ block: # Result[T, void] aka `Opt`
     proc(x: int): string =
         $x
   ).get() == $oOk.get()
+
   oOk.map(
     proc(x: int) =
         discard
@@ -570,7 +575,7 @@ block: # `cstring` dangling reference protection
 
 block: # Experiments
   # Can formalise it into a template (https://github.com/arnetheduck/nim-result/issues/8)
-  template `?=`(v: untyped{nkIdent}; vv: Result): bool =
+  template `?=`(v: untyped{nkIdent}, vv: Result): bool =
     (
       let vr = vv
       template v(): auto {.used.} =

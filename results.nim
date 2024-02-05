@@ -347,8 +347,8 @@ func raiseResultOk[T, E](self: Result[T, E]) {.noreturn, noinline.} =
     raise (ref ResultError[void])(msg: "Trying to access error with value")
   else:
     raise (ref ResultError[T])(
-        msg: "Trying to access error with value", error: self.vResultPrivate
-      )
+      msg: "Trying to access error with value", error: self.vResultPrivate
+    )
 
 func raiseResultError[T, E](self: Result[T, E]) {.noreturn, noinline.} =
   # noinline because raising should take as little space as possible at call
@@ -367,8 +367,8 @@ func raiseResultError[T, E](self: Result[T, E]) {.noreturn, noinline.} =
     raise (ref ResultError[E])(error: self.eResultPrivate, msg: $self.eResultPrivate)
   else:
     raise (ref ResultError[E])(
-        msg: "Trying to access value with err", error: self.eResultPrivate
-      )
+      msg: "Trying to access value with err", error: self.eResultPrivate
+    )
 
 func raiseResultDefect(m: string, v: auto) {.noreturn, noinline.} =
   mixin `$`
@@ -976,10 +976,8 @@ func get*[T, E](self: Result[T, E], otherwise: T): T {.inline.} =
   ## See `valueOr` for a template version that avoids evaluating `otherwise`
   ## unless necessary
   case self.oResultPrivate
-  of true:
-    self.vResultPrivate
-  of false:
-    otherwise
+  of true: self.vResultPrivate
+  of false: otherwise
 
 template isOkOr*[T, E](self: Result[T, E], body: untyped) =
   ## Evaluate `body` iff result has been assigned an error

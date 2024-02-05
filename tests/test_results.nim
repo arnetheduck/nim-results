@@ -97,16 +97,12 @@ block:
     doAssert value == rOk.value()
 
   doAssert rOk.valueOr(failFast()) == rOk.value()
-  let
-    rErrV =
-      rErr.valueOr:
-        error.len
+  let rErrV = rErr.valueOr:
+    error.len
   doAssert rErrV == rErr.error.len()
 
-  let
-    rOkV =
-      rOk.errorOr:
-        $value
+  let rOkV = rOk.errorOr:
+    $value
   doAssert rOkV == $rOk.get()
 
   # Exceptions -> results
@@ -116,18 +112,14 @@ block:
     func raisesVoid() =
       raise (ref CatchableError)(msg: "hello")
 
-    let
-      c =
-        catch:
-          raises()
+    let c = catch:
+      raises()
     doAssert c.isErr
 
     when (NimMajor, NimMinor) >= (1, 6):
       # Earlier versions complain about the type of the raisesVoid expression
-      let
-        d =
-          catch:
-            raisesVoid()
+      let d = catch:
+        raisesVoid()
       doAssert d.isErr
 
   # De-reference
@@ -165,7 +157,7 @@ block:
   doAssert (
     rOk.flatMap(
       proc(x: int): Result[string, string] =
-          Result[string, string].ok($x)
+        Result[string, string].ok($x)
     )[] == $rOk.value
   )
 
@@ -255,15 +247,15 @@ block:
   # Filter
   doAssert rOk.filter(
     proc(x: int): auto =
-        Result[void, string].ok()
+      Result[void, string].ok()
   ) == rOk
   doAssert rOk.filter(
     proc(x: int): auto =
-        Result[void, string].err("filter")
+      Result[void, string].err("filter")
   ).error == "filter"
   doAssert rErr.filter(
     proc(x: int): auto =
-        Result[void, string].err("filter")
+      Result[void, string].err("filter")
   ) == rErr
 
   # Collections
@@ -318,10 +310,9 @@ func testToException(): int =
 
 doAssert testToException() == 42
 
-type
-  AnEnum2 = enum
-    anEnum2A
-    anEnum2B
+type AnEnum2 = enum
+  anEnum2A
+  anEnum2B
 
 func testToString(): int =
   try:
@@ -378,30 +369,40 @@ block: # Result[void, E]
   doAssert (vOk != vErr)
 
   # Mapping
-  doAssert vOk.map(
+  doAssert vOk
+  .map(
     proc(): int =
-        42
-  ).get() == 42
+      42
+  )
+  .get() == 42
 
-  vOk.map(
+  vOk
+  .map(
     proc() =
-        discard
-  ).get()
+      discard
+  )
+  .get()
 
-  vOk.mapErr(
+  vOk
+  .mapErr(
     proc(x: int): int =
-        10
-  ).get()
+      10
+  )
+  .get()
 
-  vOk.mapErr(
+  vOk
+  .mapErr(
     proc(x: int) =
-        discard
-  ).get()
+      discard
+  )
+  .get()
 
-  doAssert vErr.mapErr(
+  doAssert vErr
+  .mapErr(
     proc(x: int): int =
-        10
-  ).error() == 10
+      10
+  )
+  .error() == 10
 
   # string conversion
   doAssert $vOk == "ok()"
@@ -425,15 +426,15 @@ block: # Result[void, E]
   # Filter
   doAssert vOk.filter(
     proc(): auto =
-        Result[void, int].ok()
+      Result[void, int].ok()
   ) == vOk
   doAssert vOk.filter(
     proc(): auto =
-        Result[void, int].err(100)
+      Result[void, int].err(100)
   ).error == 100
   doAssert vErr.filter(
     proc(): auto =
-        Result[void, int].err(100)
+      Result[void, int].err(100)
   ) == vErr
 
 block: # Result[T, void] aka `Opt`
@@ -481,29 +482,39 @@ block: # Result[T, void] aka `Opt`
   oErr.unsafeError()
 
   # Mapping
-  doAssert oOk.map(
+  doAssert oOk
+  .map(
     proc(x: int): string =
-        $x
-  ).get() == $oOk.get()
+      $x
+  )
+  .get() == $oOk.get()
 
-  oOk.map(
+  oOk
+  .map(
     proc(x: int) =
-        discard
-  ).get()
+      discard
+  )
+  .get()
 
-  doAssert oOk.mapErr(
+  doAssert oOk
+  .mapErr(
     proc(): int =
-        10
-  ).get() == oOk.get()
-  doAssert oOk.mapErr(
+      10
+  )
+  .get() == oOk.get()
+  doAssert oOk
+  .mapErr(
     proc() =
-        discard
-  ).get() == oOk.get()
+      discard
+  )
+  .get() == oOk.get()
 
-  doAssert oErr.mapErr(
+  doAssert oErr
+  .mapErr(
     proc(): int =
-        10
-  ).error() == 10
+      10
+  )
+  .error() == 10
 
   # string conversion
   doAssert $oOk == "ok(42)"
@@ -522,28 +533,32 @@ block: # Result[T, void] aka `Opt`
   # Filter
   doAssert oOk.filter(
     proc(x: int): auto =
-        Result[void, void].ok()
+      Result[void, void].ok()
   ) == oOk
-  doAssert oOk.filter(
+  doAssert oOk
+  .filter(
     proc(x: int): auto =
-        Result[void, void].err()
-  ).isErr()
+      Result[void, void].err()
+  )
+  .isErr()
   doAssert oErr.filter(
     proc(x: int): auto =
-        Result[void, void].err()
+      Result[void, void].err()
   ) == oErr
 
   doAssert oOk.filter(
     proc(x: int): bool =
-        true
+      true
   ) == oOk
-  doAssert oOk.filter(
+  doAssert oOk
+  .filter(
     proc(x: int): bool =
-        false
-  ).isErr()
+      false
+  )
+  .isErr()
   doAssert oErr.filter(
     proc(x: int): bool =
-        true
+      true
   ) == oErr
 
   doAssert Opt.some(42).get() == 42
@@ -620,9 +635,8 @@ block: # Experiments
 
 block: # Constants
   # TODO https://github.com/nim-lang/Nim/issues/20699
-  type
-    WithOpt = object
-      opt: Opt[int]
+  type WithOpt = object
+    opt: Opt[int]
 
   const noneWithOpt = WithOpt(opt: Opt.none(int))
   proc checkIt(v: WithOpt) =

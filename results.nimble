@@ -8,7 +8,7 @@ skipDirs      = @["benchmarks", "tests"]
 installFiles  = @["results.nim"]
 # Dependencies
 
-requires "nim >= 1.2"
+requires "nim >= 1.6"
 
 proc test(env, path: string) =
   # Compilation language is controlled by TEST_LANG
@@ -21,6 +21,8 @@ proc test(env, path: string) =
 task test, "Runs the test suite":
   for f in ["test_results.nim", "test_results2.nim"]:
     test "", "tests/" & f
+    if (NimMajor, NimMinor) > (1, 6):
+      test "--mm:refc", "tests/" & f
 
 task bench, "Run benchmark":
   test "-d:release", "benchmarks/benchmark.nim"

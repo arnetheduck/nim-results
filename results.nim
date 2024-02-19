@@ -340,19 +340,17 @@ type
 
   Opt*[T] = Result[T, void]
 
-const
-  resultsGenericBindingWorkaround* {.booldefine.} = true
-    ## Enable a workaround for the template injection problem in the issue
-    ## linked below where injected templates get bound differently depending
-    ## on whether we're in a generic context or not - this leads to surprising
-    ## errors where random symbols from outer scopes get bound to the name
-    ## instead of the intended value.
-    ## However, this ugly hack might introduce more damage than it's worth so
-    ## it can be disabled at compile-time - hopefully an upstream solution
-    ## can be found.
-    # TODO https://github.com/nim-lang/Nim/issues/22605
-    # TODO https://github.com/arnetheduck/nim-results/issues/34
-
+const resultsGenericBindingWorkaround* {.booldefine.} = true
+  ## Enable a workaround for the template injection problem in the issue
+  ## linked below where injected templates get bound differently depending
+  ## on whether we're in a generic context or not - this leads to surprising
+  ## errors where random symbols from outer scopes get bound to the name
+  ## instead of the intended value.
+  ## However, this ugly hack might introduce more damage than it's worth so
+  ## it can be disabled at compile-time - hopefully an upstream solution
+  ## can be found.
+  # TODO https://github.com/nim-lang/Nim/issues/22605
+  # TODO https://github.com/arnetheduck/nim-results/issues/34
 
 func raiseResultOk[T, E](self: Result[T, E]) {.noreturn, noinline.} =
   # noinline because raising should take as little space as possible at call
@@ -360,7 +358,9 @@ func raiseResultOk[T, E](self: Result[T, E]) {.noreturn, noinline.} =
   when T is void:
     raise (ref ResultError[void])(msg: "Trying to access error with value")
   else:
-    raise (ref ResultError[T])(msg: "Trying to access error with value", error: self.vResultPrivate)
+    raise (ref ResultError[T])(
+      msg: "Trying to access error with value", error: self.vResultPrivate
+    )
 
 func raiseResultError[T, E](self: Result[T, E]) {.noreturn, noinline.} =
   # noinline because raising should take as little space as possible at call
@@ -376,15 +376,18 @@ func raiseResultError[T, E](self: Result[T, E]) {.noreturn, noinline.} =
   elif compiles(toException(self.eResultPrivate)):
     raise toException(self.eResultPrivate)
   elif compiles($self.eResultPrivate):
-    raise (ref ResultError[E])(
-      error: self.eResultPrivate, msg: $self.eResultPrivate)
+    raise (ref ResultError[E])(error: self.eResultPrivate, msg: $self.eResultPrivate)
   else:
-    raise (ref ResultError[E])(msg: "Trying to access value with err", error: self.eResultPrivate)
+    raise (ref ResultError[E])(
+      msg: "Trying to access value with err", error: self.eResultPrivate
+    )
 
 func raiseResultDefect(m: string, v: auto) {.noreturn, noinline.} =
   mixin `$`
-  when compiles($v): raise (ref ResultDefect)(msg: m & ": " & $v)
-  else: raise (ref ResultDefect)(msg: m)
+  when compiles($v):
+    raise (ref ResultDefect)(msg: m & ": " & $v)
+  else:
+    raise (ref ResultDefect)(msg: m)
 
 func raiseResultDefect(m: string) {.noreturn, noinline.} =
   raise (ref ResultDefect)(msg: m)
@@ -450,21 +453,30 @@ template err*[T](self: var Result[T, void]) =
   ## Example: `result.err()`
   self = err(type self)
 
-template ok*(v: auto): auto = ok(typeof(result), v)
-template ok*(): auto = ok(typeof(result))
+template ok*(v: auto): auto =
+  ok(typeof(result), v)
 
-template err*(v: auto): auto = err(typeof(result), v)
-template err*(): auto = err(typeof(result))
+template ok*(): auto =
+  ok(typeof(result))
 
-template isOk*(self: Result): bool = self.oResultPrivate
-template isErr*(self: Result): bool = not self.oResultPrivate
+template err*(v: auto): auto =
+  err(typeof(result), v)
+
+template err*(): auto =
+  err(typeof(result))
+
+template isOk*(self: Result): bool =
+  self.oResultPrivate
+
+template isErr*(self: Result): bool =
+  not self.oResultPrivate
 
 when not defined(nimHasEffectsOfs):
   template effectsOf(f: untyped) {.pragma, used.}
 
 func map*[T0: not void, E; T1: not void](
-    self: Result[T0, E], f: proc(x: T0): T1):
-    Result[T1, E] {.inline, effectsOf: f.} =
+    self: Result[T0, E], f: proc(x: T0): T1
+): Result[T1, E] {.inline, effectsOf: f.} =
   ## Transform value using f, or return error
   ##
   ## ```
@@ -485,8 +497,8 @@ func map*[T0: not void, E; T1: not void](
       result.err(self.eResultPrivate)
 
 func map*[T: not void, E](
-    self: Result[T, E], f: proc(x: T)):
-    Result[void, E] {.inline, effectsOf: f.} =
+    self: Result[T, E], f: proc(x: T)
+): Result[void, E] {.inline, effectsOf: f.} =
   ## Transform value using f, or return error
   ##
   ## ```
@@ -504,8 +516,8 @@ func map*[T: not void, E](
       result.err(self.eResultPrivate)
 
 func map*[E; T1: not void](
-    self: Result[void, E], f: proc(): T1):
-    Result[T1, E] {.inline, effectsOf: f.} =
+    self: Result[void, E], f: proc(): T1
+): Result[T1, E] {.inline, effectsOf: f.} =
   ## Transform value using f, or return error
   case self.oResultPrivate
   of true:
@@ -516,9 +528,7 @@ func map*[E; T1: not void](
     else:
       result.err(self.eResultPrivate)
 
-func map*[E](
-    self: Result[void, E], f: proc()):
-    Result[void, E] {.inline, effectsOf: f.} =
+func map*[E](self: Result[void, E], f: proc()): Result[void, E] {.inline, effectsOf: f.} =
   ## Call f if `self` is ok
   case self.oResultPrivate
   of true:
@@ -531,8 +541,8 @@ func map*[E](
       result.err(self.eResultPrivate)
 
 func flatMap*[T0: not void, E, T1](
-    self: Result[T0, E], f: proc(x: T0): Result[T1, E]):
-    Result[T1, E] {.inline, effectsOf: f.} =
+    self: Result[T0, E], f: proc(x: T0): Result[T1, E]
+): Result[T1, E] {.inline, effectsOf: f.} =
   case self.oResultPrivate
   of true:
     f(self.vResultPrivate)
@@ -543,8 +553,8 @@ func flatMap*[T0: not void, E, T1](
       Result[T1, E].err(self.eResultPrivate)
 
 func flatMap*[E, T1](
-    self: Result[void, E], f: proc(): Result[T1, E]):
-    Result[T1, E] {.inline, effectsOf: f.} =
+    self: Result[void, E], f: proc(): Result[T1, E]
+): Result[T1, E] {.inline, effectsOf: f.} =
   case self.oResultPrivate
   of true:
     f()
@@ -554,9 +564,9 @@ func flatMap*[E, T1](
     else:
       Result[T1, E].err(self.eResultPrivate)
 
-func mapErr*[T; E0: not void; E1: not void](
-    self: Result[T, E0], f: proc(x: E0): E1):
-    Result[T, E1] {.inline, effectsOf: f.} =
+func mapErr*[T; E0: not void, E1: not void](
+    self: Result[T, E0], f: proc(x: E0): E1
+): Result[T, E1] {.inline, effectsOf: f.} =
   ## Transform error using f, or leave untouched
   case self.oResultPrivate
   of true:
@@ -568,8 +578,8 @@ func mapErr*[T; E0: not void; E1: not void](
     result.err(f(self.eResultPrivate))
 
 func mapErr*[T; E1: not void](
-    self: Result[T, void], f: proc(): E1):
-    Result[T, E1] {.inline, effectsOf: f.} =
+    self: Result[T, void], f: proc(): E1
+): Result[T, E1] {.inline, effectsOf: f.} =
   ## Transform error using f, or return value
   case self.oResultPrivate
   of true:
@@ -581,8 +591,8 @@ func mapErr*[T; E1: not void](
     result.err(f())
 
 func mapErr*[T; E0: not void](
-    self: Result[T, E0], f: proc(x: E0)):
-    Result[T, void] {.inline, effectsOf: f.} =
+    self: Result[T, E0], f: proc(x: E0)
+): Result[T, void] {.inline, effectsOf: f.} =
   ## Transform error using f, or return value
   case self.oResultPrivate
   of true:
@@ -595,8 +605,8 @@ func mapErr*[T; E0: not void](
     result.err()
 
 func mapErr*[T](
-    self: Result[T, void], f: proc()):
-    Result[T, void] {.inline, effectsOf: f.} =
+    self: Result[T, void], f: proc()
+): Result[T, void] {.inline, effectsOf: f.} =
   ## Transform error using f, or return value
   case self.oResultPrivate
   of true:
@@ -609,7 +619,8 @@ func mapErr*[T](
     result.err()
 
 func mapConvert*[T0: not void, E](
-    self: Result[T0, E], T1: type): Result[T1, E] {.inline.} =
+    self: Result[T0, E], T1: type
+): Result[T1, E] {.inline.} =
   ## Convert result value to A using an conversion
   # Would be nice if it was automatic...
   case self.oResultPrivate
@@ -624,8 +635,7 @@ func mapConvert*[T0: not void, E](
     else:
       result.err(self.eResultPrivate)
 
-func mapCast*[T0: not void, E](
-    self: Result[T0, E], T1: type): Result[T1, E] {.inline.} =
+func mapCast*[T0: not void, E](self: Result[T0, E], T1: type): Result[T1, E] {.inline.} =
   ## Convert result value to A using a cast
   ## Would be nice with nicer syntax...
   case self.oResultPrivate
@@ -640,8 +650,7 @@ func mapCast*[T0: not void, E](
     else:
       result.err(self.eResultPrivate)
 
-func mapConvertErr*[T, E0](
-    self: Result[T, E0], E1: type): Result[T, E1] {.inline.} =
+func mapConvertErr*[T, E0](self: Result[T, E0], E1: type): Result[T, E1] {.inline.} =
   ## Convert result error to E1 using an conversion
   # Would be nice if it was automatic...
   when E0 is E1:
@@ -658,8 +667,7 @@ func mapConvertErr*[T, E0](
       else:
         result.err(E1(self.eResultPrivate))
 
-func mapCastErr*[T, E0](
-    self: Result[T, E0], E1: type): Result[T, E1] {.inline.} =
+func mapCastErr*[T, E0](self: Result[T, E0], E1: type): Result[T, E1] {.inline.} =
   ## Convert result value to A using a cast
   ## Would be nice with nicer syntax...
   if self.oResultPrivate:
@@ -719,7 +727,7 @@ template orErr*[T, E0, E1](self: Result[T, E0], error: E1): Result[T, E1] =
   ## ```
   ##
   ## ** Experimental, may be removed **
-  let  s = (self) # TODO avoid copy
+  let s = (self) # TODO avoid copy
   type R = Result[T, E1]
   case s.oResultPrivate
   of true:
@@ -732,7 +740,6 @@ template orErr*[T, E0, E1](self: Result[T, E0], error: E1): Result[T, E1] =
         ok(R, s.vResultPrivate)
   of false:
     err(R, error)
-
 
 template catch*(body: typed): Result[type(body), ref CatchableError] =
   ## Catch exceptions for body and store them in the Result
@@ -772,10 +779,9 @@ template capture*[E: Exception](T: type, someExceptionExpr: ref E): Result[T, re
     ret = R.err(caught)
   ret
 
-func `==`*[
-    T0: not void, E0: not void,
-    T1: not void, E1: not void](
-      lhs: Result[T0, E0], rhs: Result[T1, E1]): bool {.inline.} =
+func `==`*[T0: not void, E0: not void, T1: not void, E1: not void](
+    lhs: Result[T0, E0], rhs: Result[T1, E1]
+): bool {.inline.} =
   if lhs.oResultPrivate != rhs.oResultPrivate:
     false
   else:
@@ -785,8 +791,7 @@ func `==`*[
     of false:
       lhs.eResultPrivate == rhs.eResultPrivate
 
-func `==`*[E0, E1](
-    lhs: Result[void, E0], rhs: Result[void, E1]): bool {.inline.} =
+func `==`*[E0, E1](lhs: Result[void, E0], rhs: Result[void, E1]): bool {.inline.} =
   if lhs.oResultPrivate != rhs.oResultPrivate:
     false
   else:
@@ -796,8 +801,7 @@ func `==`*[E0, E1](
     of false:
       lhs.eResultPrivate == rhs.eResultPrivate
 
-func `==`*[T0, T1](
-    lhs: Result[T0, void], rhs: Result[T1, void]): bool {.inline.} =
+func `==`*[T0, T1](lhs: Result[T0, void], rhs: Result[T1, void]): bool {.inline.} =
   if lhs.oResultPrivate != rhs.oResultPrivate:
     false
   else:
@@ -822,8 +826,12 @@ func value*[T: not void, E](self: var Result[T, E]): var T {.inline.} =
   ## Fetch value of result if set, or raise Defect
   ## Exception bridge mode: raise given Exception instead
   ## See also: Option.get
-  (block:
-    withAssertOk(self): addr self.vResultPrivate)[]
+
+  (
+    block:
+      withAssertOk(self):
+        addr self.vResultPrivate
+  )[]
 
 template `[]`*[T: not void, E](self: Result[T, E]): T =
   ## Fetch value of result if set, or raise Defect
@@ -877,24 +885,30 @@ func expect*[T, E](self: Result[T, E], m: string): T =
       self.vResultPrivate
 
 func expect*[T: not void, E](self: var Result[T, E], m: string): var T =
-  (case self.oResultPrivate
-  of false:
-    when E isnot void:
-      raiseResultDefect(m, self.eResultPrivate)
-    else:
-      raiseResultDefect(m)
-  of true:
-    addr self.vResultPrivate)[]
+  (
+    case self.oResultPrivate
+    of false:
+      when E isnot void:
+        raiseResultDefect(m, self.eResultPrivate)
+      else:
+        raiseResultDefect(m)
+    of true:
+      addr self.vResultPrivate
+  )[]
 
 func `$`*[T, E](self: Result[T, E]): string =
   ## Returns string representation of `self`
   case self.oResultPrivate
   of true:
-    when T is void: "ok()"
-    else: "ok(" & $self.vResultPrivate & ")"
+    when T is void:
+      "ok()"
+    else:
+      "ok(" & $self.vResultPrivate & ")"
   of false:
-    when E is void: "none()"
-    else: "err(" & $self.eResultPrivate & ")"
+    when E is void:
+      "none()"
+    else:
+      "err(" & $self.eResultPrivate & ")"
 
 func error*[T, E](self: Result[T, E]): E =
   ## Fetch error of result if set, or raise Defect
@@ -946,28 +960,36 @@ func optError*[T, E](self: Result[T, E]): Opt[E] =
     Opt.some(self.eResultPrivate)
 
 # Alternative spellings for `value`, for `options` compatibility
-template get*[T: not void, E](self: Result[T, E]): T = self.value()
-template get*[E](self: Result[void, E]) = self.value()
+template get*[T: not void, E](self: Result[T, E]): T =
+  self.value()
 
-template tryGet*[T: not void, E](self: Result[T, E]): T = self.tryValue()
-template tryGet*[E](self: Result[void, E]) = self.tryValue()
+template get*[E](self: Result[void, E]) =
+  self.value()
 
-template unsafeGet*[T: not void, E](self: Result[T, E]): T = self.unsafeValue()
-template unsafeGet*[E](self: Result[void, E]) = self.unsafeValue()
+template tryGet*[T: not void, E](self: Result[T, E]): T =
+  self.tryValue()
+
+template tryGet*[E](self: Result[void, E]) =
+  self.tryValue()
+
+template unsafeGet*[T: not void, E](self: Result[T, E]): T =
+  self.unsafeValue()
+
+template unsafeGet*[E](self: Result[void, E]) =
+  self.unsafeValue()
 
 # `var` overloads should not be needed but result in invalid codegen (!):
 # TODO https://github.com/nim-lang/Nim/issues/22049
-func get*[T: not void, E](self: var Result[T, E]): var T = self.value()
+func get*[T: not void, E](self: var Result[T, E]): var T =
+  self.value()
 
 func get*[T, E](self: Result[T, E], otherwise: T): T {.inline.} =
   ## Fetch value of result if set, or return the value `otherwise`
   ## See `valueOr` for a template version that avoids evaluating `otherwise`
   ## unless necessary
   case self.oResultPrivate
-  of true:
-    self.vResultPrivate
-  of false:
-    otherwise
+  of true: self.vResultPrivate
+  of false: otherwise
 
 when resultsGenericBindingWorkaround:
   import macros
@@ -1007,17 +1029,17 @@ when resultsGenericBindingWorkaround:
         else:
           result = copyNimNode(n)
           result.add n[0]
-          for i in 1..<n.len:
+          for i in 1 ..< n.len:
             result.add replace(n[i], what, with)
       of nnkExprEqExpr:
         # "error = xxx" - function call with named parameters and other weird stuff
         result = copyNimNode(n)
         result.add n[0]
-        for i in 1..<n.len:
+        for i in 1 ..< n.len:
           result.add replace(n[i], what, with)
       of nnkLetSection, nnkVarSection, nnkFormalParams:
         result = copyNimNode(n)
-        for i in 0..<n.len:
+        for i in 0 ..< n.len:
           result.add replace(n[i], what, with)
       of nnkDotExpr:
         # Ignore rhs in "abc.error"
@@ -1025,15 +1047,17 @@ when resultsGenericBindingWorkaround:
         result.add(replace(n[0], what, with))
         result.add(n[1])
       else:
-        if  (n.kind == nnkForStmt and (
-              n[0].eqIdent(what) or (n.len == 4 and n[1].eqIdent(what))) or
-            (n.kind == nnkIdentDefs and n[0].eqIdent(what))):
+        if (
+          n.kind == nnkForStmt and
+          (n[0].eqIdent(what) or (n.len == 4 and n[1].eqIdent(what))) or
+          (n.kind == nnkIdentDefs and n[0].eqIdent(what))
+        ):
           # Naming the symbol the same way requires lots of magic here - just
           # say no
           error("Shadowing variable declarations of `" & what & "` not supported", n[0])
 
         result = copyNimNode(n)
-        for i in 0..<n.len:
+        for i in 0 ..< n.len:
           result.add replace(n[i], what, with)
 
   macro replaceHack(body, what, with: untyped): untyped =
@@ -1068,10 +1092,14 @@ template isOkOr*[T, E](self: Result[T, E], body: untyped) =
   of false:
     when E isnot void:
       when resultsGenericBindingWorkaround:
-        template error: E {.used, gensym.} = s.eResultPrivate
+        template error(): E {.used, gensym.} =
+          s.eResultPrivate
+
         replaceHack(body, "error", error)
       else:
-        template error: E {.used, inject.} = s.eResultPrivate
+        template error(): E {.used, inject.} =
+          s.eResultPrivate
+
         body
     else:
       body
@@ -1104,10 +1132,14 @@ template isErrOr*[T, E](self: Result[T, E], body: untyped) =
   of true:
     when T isnot void:
       when resultsGenericBindingWorkaround:
-        template value: T {.used, gensym.} = s.vResultPrivate
+        template value(): T {.used, gensym.} =
+          s.vResultPrivate
+
         replaceHack(body, "value", value)
       else:
-        template value: T {.used, inject.} = s.vResultPrivate
+        template value(): T {.used, inject.} =
+          s.vResultPrivate
+
         body
     else:
       body
@@ -1146,10 +1178,14 @@ template valueOr*[T: not void, E](self: Result[T, E], def: untyped): T =
   of false:
     when E isnot void:
       when resultsGenericBindingWorkaround:
-        template error: E {.used, gensym.} = s.eResultPrivate
+        template error(): E {.used, gensym.} =
+          s.eResultPrivate
+
         replaceHack(def, "error", error)
       else:
-        template error: E {.used, inject.} = s.eResultPrivate
+        template error(): E {.used, inject.} =
+          s.eResultPrivate
+
         def
     else:
       def
@@ -1167,10 +1203,14 @@ template errorOr*[T; E: not void](self: Result[T, E], def: untyped): E =
   of true:
     when T isnot void:
       when resultsGenericBindingWorkaround:
-        template value: T {.used, gensym.} = s.vResultPrivate
+        template value(): T {.used, gensym.} =
+          s.vResultPrivate
+
         replaceHack(def, "value", value)
       else:
-        template value: T {.used, inject.} = s.vResultPrivate
+        template value(): T {.used, inject.} =
+          s.vResultPrivate
+
         def
     else:
       def
@@ -1187,9 +1227,8 @@ func flatten*[T, E](self: Result[Result[T, E], E]): Result[T, E] =
       err(Result[T, E], self.error)
 
 func filter*[T, E](
-    self: Result[T, E],
-    callback: proc(x: T): Result[void, E]):
-    Result[T, E] {.effectsOf: callback.} =
+    self: Result[T, E], callback: proc(x: T): Result[void, E]
+): Result[T, E] {.effectsOf: callback.} =
   ## Apply `callback` to the `self`, iff `self` is not an error. If `callback`
   ## returns an error, return that error, else return `self`
 
@@ -1200,9 +1239,8 @@ func filter*[T, E](
     self
 
 func filter*[E](
-    self: Result[void, E],
-    callback: proc(): Result[void, E]):
-    Result[void, E] {.effectsOf: callback.} =
+    self: Result[void, E], callback: proc(): Result[void, E]
+): Result[void, E] {.effectsOf: callback.} =
   ## Apply `callback` to the `self`, iff `self` is not an error. If `callback`
   ## returns an error, return that error, else return `self`
 
@@ -1213,9 +1251,8 @@ func filter*[E](
     self
 
 func filter*[T](
-    self: Result[T, void],
-    callback: proc(x: T): bool):
-    Result[T, void] {.effectsOf: callback.} =
+    self: Result[T, void], callback: proc(x: T): bool
+): Result[T, void] {.effectsOf: callback.} =
   ## Apply `callback` to the `self`, iff `self` is not an error. If `callback`
   ## returns an error, return that error, else return `self`
 
@@ -1280,7 +1317,7 @@ template `?`*[T, E](self: Result[T, E]): auto =
       else:
         return err(typeof(result), v.eResultPrivate)
   of true:
-    when not(T is void):
+    when not (T is void):
       v.vResultPrivate
 
 # Collection integration

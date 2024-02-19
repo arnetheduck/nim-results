@@ -29,7 +29,9 @@ type
     f3*: Test1Type
 
   ErrorCode* = enum
-    Fail1, Fail2, Fail3
+    Fail1
+    Fail2
+    Fail3
 
   Result1* = Result[Test1Type, ErrorCode]
   Result2* = Result[Test2Type, ErrorCode]
@@ -52,18 +54,13 @@ proc getValue2(): Test2Type =
   result = Test2Type(f1: 0xCAFE, f2: 0xCAFE, f3: 0xCAFE)
 
 proc getResult3(): Result3 =
-  result.ok(Test3Type(
-    f1: 0xCAFE,
-    f2: 0xCAFE,
-    f3: Test2Type(f1: 0xCAFE, f2: 0xCAFE, f3: 0xCAFE)
-  ))
+  result.ok(
+    Test3Type(f1: 0xCAFE, f2: 0xCAFE, f3: Test2Type(f1: 0xCAFE, f2: 0xCAFE, f3: 0xCAFE))
+  )
 
 proc getValue3(): Test3Type =
-  result = Test3Type(
-    f1: 0xCAFE,
-    f2: 0xCAFE,
-    f3: Test2Type(f1: 0xCAFE, f2: 0xCAFE, f3: 0xCAFE)
-  )
+  result =
+    Test3Type(f1: 0xCAFE, f2: 0xCAFE, f3: Test2Type(f1: 0xCAFE, f2: 0xCAFE, f3: 0xCAFE))
 
 proc getResult41(): Result4 =
   var res = newSeq[byte](16384)
@@ -115,102 +112,102 @@ proc getValue7(): Test7Type =
   result = Test7Type(f1: 0xCAFE, f2: 0xCAFE, f3: 0xCAFE)
 
 proc test1R(num: int): int =
-  for i in 0..<num:
+  for i in 0 ..< num:
     var opt = getResult1()[]
     inc(result)
 
 proc test1V(num: int): int =
-  for i in 0..<num:
+  for i in 0 ..< num:
     var opt = getValue1()
     inc(result)
 
 proc test2R(num: int): int =
-  for i in 0..<num:
+  for i in 0 ..< num:
     var opt = getResult2()[]
     inc(result)
 
 proc test2V(num: int): int =
-  for i in 0..<num:
+  for i in 0 ..< num:
     var opt = getValue2()
     inc(result)
 
 proc test3R(num: int): int =
-  for i in 0..<num:
+  for i in 0 ..< num:
     var opt = getResult3()[]
     inc(result)
 
 proc test3V(num: int): int =
-  for i in 0..<num:
+  for i in 0 ..< num:
     var opt = getValue3()
     inc(result)
 
 proc test41R(num: int): int =
-  for i in 0..<num:
+  for i in 0 ..< num:
     var opt = getResult41()[]
     inc(result)
 
 proc test41V(num: int): int =
-  for i in 0..<num:
+  for i in 0 ..< num:
     var opt = getValue41()
     inc(result)
 
 proc test42R(num: int): int =
-  for i in 0..<num:
+  for i in 0 ..< num:
     var opt = getResult42()[]
     inc(result)
 
 proc test42V(num: int): int =
-  for i in 0..<num:
+  for i in 0 ..< num:
     var opt = getValue42()
     inc(result)
 
 proc test51R(num: int): int =
-  for i in 0..<num:
+  for i in 0 ..< num:
     var opt = getResult51()[]
     inc(result)
 
 proc test51V(num: int): int =
-  for i in 0..<num:
+  for i in 0 ..< num:
     var opt = getValue51()
     inc(result)
 
 proc test52R(num: int): int =
-  for i in 0..<num:
+  for i in 0 ..< num:
     var opt = getResult52()[]
     inc(result)
 
 proc test52V(num: int): int =
-  for i in 0..<num:
+  for i in 0 ..< num:
     var opt = getValue52()
     inc(result)
 
 proc test61R(num: int): int =
-  for i in 0..<num:
+  for i in 0 ..< num:
     var opt = getResult61()[]
     inc(result)
 
 proc test61V(num: int): int =
-  for i in 0..<num:
+  for i in 0 ..< num:
     var opt = getValue61()
     inc(result)
 
 proc test62R(num: int): int =
-  for i in 0..<num:
+  for i in 0 ..< num:
     var opt = getResult62()[]
     inc(result)
 
 proc test62V(num: int): int =
-  for i in 0..<num:
+  for i in 0 ..< num:
     var opt = getValue62()
     inc(result)
 
 proc test7R(num: int): int =
-  for i in 0..<num:
+  for i in 0 ..< num:
     var opt = getResult7()[]
     inc(result)
 
 proc test7V(num: int): int =
-  for i in 0..<num:
+  for i in 0 ..< num:
     var opt = getValue7()
     inc(result)
 
@@ -230,7 +227,8 @@ when isMainModule:
     echo "  result test = ", $(b2 - a2)
     var d1 = b1 - a1
     var d2 = b2 - a2
-    if d1 == 0: d1 = 0.00000001
+    if d1 == 0:
+      d1 = 0.00000001
     echo "  difference = ", round((float(d2) * 100.00) / float(d1), 2), "%"
 
   block:
@@ -245,7 +243,8 @@ when isMainModule:
     echo "  result test = ", $(b2 - a2)
     var d1 = b1 - a1
     var d2 = b2 - a2
-    if d1 == 0: d1 = 0.00000001
+    if d1 == 0:
+      d1 = 0.00000001
     echo "  difference = ", round((float(d2) * 100.00) / float(d1), 2), "%"
 
   block:
@@ -260,7 +259,8 @@ when isMainModule:
     echo "  result test = ", $(b2 - a2)
     var d1 = b1 - a1
     var d2 = b2 - a2
-    if d1 == 0: d1 = 0.00000001
+    if d1 == 0:
+      d1 = 0.00000001
     echo "  difference = ", round((float(d2) * 100.00) / float(d1), 2), "%"
 
   block:
@@ -275,7 +275,8 @@ when isMainModule:
     echo "  result test = ", $(b2 - a2)
     var d1 = b1 - a1
     var d2 = b2 - a2
-    if d1 == 0: d1 = 0.00000001
+    if d1 == 0:
+      d1 = 0.00000001
     echo "  difference = ", round((float(d2) * 100.00) / float(d1), 2), "%"
 
   block:
@@ -290,7 +291,8 @@ when isMainModule:
     echo "  result test = ", $(b2 - a2)
     var d1 = b1 - a1
     var d2 = b2 - a2
-    if d1 == 0: d1 = 0.00000001
+    if d1 == 0:
+      d1 = 0.00000001
     echo "  difference = ", round((float(d2) * 100.00) / float(d1), 2), "%"
 
   block:
@@ -305,7 +307,8 @@ when isMainModule:
     echo "  result test = ", $(b2 - a2)
     var d1 = b1 - a1
     var d2 = b2 - a2
-    if d1 == 0: d1 = 0.00000001
+    if d1 == 0:
+      d1 = 0.00000001
     echo "  difference = ", round((float(d2) * 100.00) / float(d1), 2), "%"
 
   block:
@@ -320,7 +323,8 @@ when isMainModule:
     echo "  result test = ", $(b2 - a2)
     var d1 = b1 - a1
     var d2 = b2 - a2
-    if d1 == 0: d1 = 0.00000001
+    if d1 == 0:
+      d1 = 0.00000001
     echo "  difference = ", round((float(d2) * 100.00) / float(d1), 2), "%"
 
   block:
@@ -335,7 +339,8 @@ when isMainModule:
     echo "  result test = ", $(b2 - a2)
     var d1 = b1 - a1
     var d2 = b2 - a2
-    if d1 == 0: d1 = 0.00000001
+    if d1 == 0:
+      d1 = 0.00000001
     echo "  difference = ", round((float(d2) * 100.00) / float(d1), 2), "%"
 
   block:
@@ -350,7 +355,8 @@ when isMainModule:
     echo "  result test = ", $(b2 - a2)
     var d1 = b1 - a1
     var d2 = b2 - a2
-    if d1 == 0: d1 = 0.00000001
+    if d1 == 0:
+      d1 = 0.00000001
     echo "  difference = ", round((float(d2) * 100.00) / float(d1), 2), "%"
 
   block:
@@ -365,5 +371,6 @@ when isMainModule:
     echo "  result test = ", $(b2 - a2)
     var d1 = b1 - a1
     var d2 = b2 - a2
-    if d1 == 0: d1 = 0.00000001
+    if d1 == 0:
+      d1 = 0.00000001
     echo "  difference = ", round((float(d2) * 100.00) / float(d1), 2), "%"

@@ -381,6 +381,7 @@ block: # Result[void, E]
       42
   )
   .get() == 42
+
   vOk
   .map(
     proc() =
@@ -394,6 +395,7 @@ block: # Result[void, E]
       10
   )
   .get()
+
   vOk
   .mapErr(
     proc(x: int) =

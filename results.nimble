@@ -8,7 +8,7 @@ skipDirs      = @["benchmarks", "tests"]
 installFiles  = @["results.nim"]
 # Dependencies
 
-requires "nim >= 1.6"
+requires "nim >= 1.2"
 
 proc test(env, path: string) =
   # Compilation language is controlled by TEST_LANG

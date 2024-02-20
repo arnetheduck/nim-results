@@ -67,16 +67,18 @@ block:
 
   # Exception on access
   doAssert (
-    try:
-      (discard rOk.tryError(); false)
-    except ResultError[int]:
-      true
+    block:
+      try:
+        (discard rOk.tryError(); false)
+      except ResultError[int]:
+        true
   )
   doAssert (
-    try:
-      (discard rErr.tryGet(); false)
-    except ResultError[string]:
-      true
+    block:
+      try:
+        (discard rErr.tryGet(); false)
+      except ResultError[string]:
+        true
   )
 
   # Value access or default
@@ -596,13 +598,11 @@ block: # `cstring` dangling reference protection
 block: # Experiments
   # Can formalise it into a template (https://github.com/arnetheduck/nim-result/issues/8)
   template `?=`(v: untyped{nkIdent}, vv: Result): bool =
-    (
-      let vr = vv
-      template v(): auto {.used.} =
-        unsafeGet(vr)
+    let vr = vv
+    template v(): auto {.used.} =
+      unsafeGet(vr)
 
-      vr.isOk
-    )
+    vr.isOk
 
   if f ?= Result[int, string].ok(42):
     doAssert f == 42

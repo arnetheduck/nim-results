@@ -21,6 +21,8 @@ proc test(env, path: string) =
 task test, "Runs the test suite":
   for f in ["test_results.nim", "test_results2.nim"]:
     test "", "tests/" & f
+    if (NimMajor, NimMinor) >= (2, 0):
+      test "--mm:refc", "tests/" & f
 
 task bench, "Run benchmark":
   test "-d:release", "benchmarks/benchmark.nim"

@@ -22,6 +22,8 @@ task test, "Runs the test suite":
   for f in ["test_results.nim", "test_results2.nim"]:
     for opt in ["", "-d:resultsGenericBindingWorkaround=false"]:
       test opt, "tests/" & f
+      if (NimMajor, NimMinor) >= (2, 0):
+        test opt & " --mm:refc", "tests/" & f
 
 task bench, "Run benchmark":
   test "-d:release", "benchmarks/benchmark.nim"

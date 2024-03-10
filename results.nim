@@ -516,7 +516,9 @@ func map*[E; T1: not void](
     else:
       result.err(self.eResultPrivate)
 
-func map*[E](self: Result[void, E], f: proc()): Result[void, E] {.inline, effectsOf: f.} =
+func map*[E](
+    self: Result[void, E], f: proc()
+): Result[void, E] {.inline, effectsOf: f.} =
   ## Call f if `self` is ok
   case self.oResultPrivate
   of true:
@@ -623,7 +625,9 @@ func mapConvert*[T0: not void, E](
     else:
       result.err(self.eResultPrivate)
 
-func mapCast*[T0: not void, E](self: Result[T0, E], T1: type): Result[T1, E] {.inline.} =
+func mapCast*[T0: not void, E](
+    self: Result[T0, E], T1: type
+): Result[T1, E] {.inline.} =
   ## Convert result value to A using a cast
   ## Would be nice with nicer syntax...
   case self.oResultPrivate

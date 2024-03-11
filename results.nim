@@ -317,26 +317,26 @@ type
     # public!
     when T is void:
       when E is void:
-        oResultPrivate*: bool
+        oResultPrivate: bool
       else:
-        case oResultPrivate*: bool
+        case oResultPrivate: bool
         of false:
-          eResultPrivate*: E
+          eResultPrivate: E
         of true:
           discard
     else:
       when E is void:
-        case oResultPrivate*: bool
+        case oResultPrivate: bool
         of false:
           discard
         of true:
-          vResultPrivate*: T
+          vResultPrivate: T
       else:
-        case oResultPrivate*: bool
+        case oResultPrivate: bool
         of false:
-          eResultPrivate*: E
+          eResultPrivate: E
         of true:
-          vResultPrivate*: T
+          vResultPrivate: T
 
   Opt*[T] = Result[T, void]
 

@@ -300,16 +300,16 @@ type
     ## https://github.com/nim-lang/Nim/issues/13799 - type issues
     ## https://github.com/nim-lang/Nim/issues/8745 - genericReset slow
     ## https://github.com/nim-lang/Nim/issues/13879 - double-zero-init slow
-    ## https://github.com/nim-lang/Nim/issues/14318 - generic error raises pragma
+    ## https://github.com/nim-lang/Nim/issues/14318 - generic error raises pragma (fixed in 1.6.14+)
 
-    # TODO https://github.com/nim-lang/Nim/issues/20699
+    # https://github.com/nim-lang/Nim/issues/20699 (fixed in 2.0.0+)
     # case oResultPrivate: bool
     # of false:
     #   eResultPrivate: E
     # of true:
     #   vResultPrivate: T
 
-    # TODO ResultPrivate works around
+    # ResultPrivate* works around (fixed in 1.6.14+):
     # * https://github.com/nim-lang/Nim/issues/3770
     # * https://github.com/nim-lang/Nim/issues/20900
     #
@@ -953,7 +953,10 @@ func optValue*[T, E](self: Result[T, E]): Opt[T] =
   ## Return the value of a Result as an Opt, or none if Result is an error
   case self.oResultPrivate
   of true:
-    Opt.some(self.vResultPrivate)
+    when T is void:
+      Opt[void].ok()
+    else:
+      Opt.some(self.vResultPrivate)
   of false:
     Opt.none(T)
 
@@ -985,7 +988,7 @@ template unsafeGet*[E](self: Result[void, E]) =
   self.unsafeValue()
 
 # `var` overloads should not be needed but result in invalid codegen (!):
-# TODO https://github.com/nim-lang/Nim/issues/22049
+# https://github.com/nim-lang/Nim/issues/22049 (fixed in 1.6.16+)
 func get*[T: not void, E](self: var Result[T, E]): var T =
   self.value()
 

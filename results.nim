@@ -935,7 +935,10 @@ func optValue*[T, E](self: Result[T, E]): Opt[T] =
   ## Return the value of a Result as an Opt, or none if Result is an error
   case self.oResultPrivate
   of true:
-    Opt.some(self.vResultPrivate)
+    when T is void:
+      Opt[void].ok()
+    else:
+      Opt.some(self.vResultPrivate)
   of false:
     Opt.none(T)
 

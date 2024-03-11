@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       branch:
-        default: stable
+        default: '"stable"'
 
 concurrency: # Cancel stale PR builds (but not push builds)
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
@@ -25,7 +25,7 @@ jobs:
           - os: linux
             cpu: amd64
             TEST_LANG: cpp
-        branch: ${{ fromJSON(format('[{0}]', inputs.branch || '"1.2.x","1.4.x","1.6.x","2.0.x", "devel"')) }}
+        branch: ${{ fromJSON(format('[{0}]', inputs.branch || '"1.2.0","1.2.x","1.4.0","1.4.x","1.6.0","1.6.x","2.0.0","2.0.x","stable","devel"')) }}
         include:
           - target:
               os: linux
@@ -34,7 +34,7 @@ jobs:
       run:
         shell: ${{ matrix.shell }}
 
-    name: 'nim-${{matrix.branch}}-${{ matrix.target.TEST_LANG }}'
+    name: 'nim-${{matrix.branch}}'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -48,5 +48,6 @@ jobs:
       - name: Run tests
         run: |
           nim --version
-          env TEST_LANG="${{ matrix.target.TEST_LANG }}" nimble test
+          env TEST_LANG="c" nimble test
+          env TEST_LANG="cpp" nimble test
 

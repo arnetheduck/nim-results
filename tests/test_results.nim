@@ -131,7 +131,7 @@ block:
       doAssert d.isErr
 
   # De-reference
-  when (NimMajor, NimMinor) >= (1, 6):
+  when (NimMajor, NimMinor, NimPatch) >= (1, 6, 12):
     {.warning[BareExcept]: off.}
 
   try:
@@ -140,7 +140,7 @@ block:
   except:
     discard
 
-  when (NimMajor, NimMinor) >= (1, 6):
+  when (NimMajor, NimMinor, NimPatch) >= (1, 6, 12):
     {.warning[BareExcept]: on.}
 
   # Comparisons

@@ -300,14 +300,8 @@ type
     ## https://github.com/nim-lang/Nim/issues/13799 - type issues
     ## https://github.com/nim-lang/Nim/issues/8745 - genericReset slow
     ## https://github.com/nim-lang/Nim/issues/13879 - double-zero-init slow
-    ## https://github.com/nim-lang/Nim/issues/14318 - generic error raises pragma
+    ## https://github.com/nim-lang/Nim/issues/14318 - generic error raises pragma (fixed in 1.6.14+)
 
-    # TODO https://github.com/nim-lang/Nim/issues/20699
-    # case oResultPrivate: bool
-    # of false:
-    #   eResultPrivate: E
-    # of true:
-    #   vResultPrivate: T
 
     # TODO ResultPrivate works around
     # * https://github.com/nim-lang/Nim/issues/3770
@@ -315,28 +309,11 @@ type
     #
     # Do not use these fields directly in your code, they're not meant to be
     # public!
-    when T is void:
-      when E is void:
-        oResultPrivate*: bool
-      else:
-        case oResultPrivate*: bool
-        of false:
-          eResultPrivate*: E
-        of true:
-          discard
-    else:
-      when E is void:
-        case oResultPrivate*: bool
-        of false:
-          discard
-        of true:
-          vResultPrivate*: T
-      else:
-        case oResultPrivate*: bool
-        of false:
-          eResultPrivate*: E
-        of true:
-          vResultPrivate*: T
+    case oResultPrivate*: bool
+    of false:
+      eResultPrivate*: E
+    of true:
+      vResultPrivate*: T
 
   Opt*[T] = Result[T, void]
 

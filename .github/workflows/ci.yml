@@ -1,5 +1,13 @@
 name: CI
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      branch:
+        default: stable
 
 concurrency: # Cancel stale PR builds (but not push builds)
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
@@ -17,62 +25,25 @@ jobs:
           - os: linux
             cpu: amd64
             TEST_LANG: cpp
-        branch: [version-1-2, version-1-4, version-1-6, version-2-0]
+        branch: ${{ fromJSON(format('[{0}]', inputs.branch || '"1.2.x","1.4.x","1.6.x","2.0.x", "devel"')) }}
         include:
           - target:
               os: linux
-            builder: ubuntu-20.04
             shell: bash
     defaults:
       run:
         shell: ${{ matrix.shell }}
 
-    name: '${{ matrix.target.os }}-${{ matrix.target.cpu }}-${{ matrix.target.TEST_LANG }} (Nim ${{ matrix.branch }})'
-    runs-on: ${{ matrix.builder }}
+    name: 'nim-${{matrix.branch}}-${{ matrix.target.TEST_LANG }}'
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Derive environment variables
-        shell: bash
-        run: |
-          if [[ '${{ matrix.target.cpu }}' == 'amd64' ]]; then
-            ARCH=64
-            PLATFORM=x64
-          else
-            ARCH=32
-            PLATFORM=x86
-          fi
-          echo "ARCH=$ARCH" >> $GITHUB_ENV
-          echo "PLATFORM=$PLATFORM" >> $GITHUB_ENV
-
-          if [[ '${{ matrix.target.os }}' == 'windows' ]]; then
-            MAKE_CMD="mingw32-make"
-          else
-            MAKE_CMD="make"
-          fi
-          echo "MAKE_CMD=$MAKE_CMD" >> $GITHUB_ENV
-
-          ncpu=
-          case '${{ runner.os }}' in
-          'Linux')
-            ncpu=$(nproc)
-            ;;
-          'macOS')
-            ncpu=$(sysctl -n hw.ncpu)
-            ;;
-          'Windows')
-            ncpu=$NUMBER_OF_PROCESSORS
-            ;;
-          esac
-          [[ -z "$ncpu" || $ncpu -le 0 ]] && ncpu=1
-          echo "ncpu=$ncpu" >> $GITHUB_ENV
-
-      - name: Build the Nim compiler
-        run: |
-          curl -O -L -s -S https://raw.githubusercontent.com/status-im/nimbus-build-system/master/scripts/build_nim.sh
-          env MAKE="${MAKE_CMD} -j${ncpu}" ARCH_OVERRIDE=${PLATFORM} CC=gcc NIM_COMMIT=${{ matrix.branch }} bash build_nim.sh nim csources dist/nimble NimBinaries
-          echo '${{ github.workspace }}/nim/bin' >> $GITHUB_PATH
+      - uses: jiro4989/setup-nim-action@v1
+        with:
+          nim-version: ${{ matrix.branch }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run tests
         run: |

@@ -99,9 +99,15 @@ block:
     doAssert value == rOk.value()
 
   doAssert rOk.valueOr(failFast()) == rOk.value()
-  let rErrV = rErr.valueOr:
-    ord(error[0])
-  doAssert rErrV == ord(rErr.error[0])
+  block: # plain syntax: `error`
+    let rErrV = rErr.valueOr:
+      ord(error[0])
+    doAssert rErrV == ord(rErr.error[0])
+
+  block: # call syntax: `error()`
+    let rErrV = rErr.valueOr:
+      ord(error()[0])
+    doAssert rErrV == ord(rErr.error()[0])
 
   block: # nested valueOr binds to the inner error
     let rInnerV = rErr.valueOr:

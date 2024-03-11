@@ -1029,10 +1029,15 @@ when resultsGenericBindingWorkaround:
     else:
       case n.kind
       of nnkCallKinds:
-        # `error(...)` - replace args but not function name
         if n[0].containsHack():
+          # Don't replace inside nested expansion
           result = n
+        elif n.len == 1 and n[0].eqIdent(what):
+          # No arguments - replace call symbol
+          result = copyNimNode(n)
+          result.add with
         else:
+          # `error(...)` - replace args but not function name
           result = copyNimNode(n)
           result.add n[0]
           for i in 1 ..< n.len:
@@ -1070,7 +1075,7 @@ when resultsGenericBindingWorkaround:
     # This hack replaces the `what` identifier with `with` except where
     # this replacing is not expected - this is an approximation of the intent
     # of injecting a template and likely doesn't cover all applicable cases
-    replace(body, $what, with)
+    result = replace(body, $what, with)
 
 when resultsGenericBindingWorkaround:
   template isOkOr*[T, E](self: Result[T, E], body: untyped) =

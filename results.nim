@@ -301,8 +301,8 @@ type
     ## https://github.com/nim-lang/Nim/issues/8745 - genericReset slow
     ## https://github.com/nim-lang/Nim/issues/13879 - double-zero-init slow
     ## https://github.com/nim-lang/Nim/issues/14318 - generic error raises pragma (fixed in 1.6.14+)
-
-    # https://github.com/nim-lang/Nim/issues/20699 (fixed in 2.0.0+)
+    ## https://github.com/nim-lang/Nim/issues/23741 - inefficient codegen for temporaries
+    ## https://github.com/nim-lang/Nim/issues/20699 (fixed in 2.0.0+)
     # case oResultPrivate: bool
     # of false:
     #   eResultPrivate: E

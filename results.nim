@@ -367,10 +367,11 @@ const
     # https://github.com/nim-lang/Nim/pull/23939
 
   resultsGenericsOpenSymWorkaround* {.booldefine.} =
-    resultsGenericsOpenSym and not defined(nimHasGenericsOpenSym)
+    resultsGenericsOpenSym and not defined(nimHasGenericsOpenSym2)
     ## Prefer macro workaround to solve genericsOpenSym issue
+    # TODO https://github.com/nim-lang/Nim/pull/23892#discussion_r1713434311
 
-  pushGenericsOpenSym = defined(nnimHasGenericsOpenSym) and resultsGenericsOpenSym
+  resultsGenericsOpenSymWorkaroundHint* {.booldefine.} = true
 
 func raiseResultOk[T, E](self: Result[T, E]) {.noreturn, noinline.} =
   # noinline because raising should take as little space as possible at call
@@ -1057,6 +1058,8 @@ when resultsGenericsOpenSymWorkaround:
           # No arguments - replace call symbol
           result = copyNimNode(n)
           result.add with
+          when resultsGenericsOpenSymWorkaroundHint:
+            hint("Replaced node with injected symbol " & what, n[0])
         else:
           # `error(...)` - replace args but not function name
           result = copyNimNode(n)
@@ -1224,6 +1227,9 @@ when resultsGenericsOpenSymWorkaround:
         def
 
 else:
+  # TODO https://github.com/nim-lang/Nim/pull/23892#discussion_r1713434311
+  const pushGenericsOpenSym = defined(nimHasGenericsOpenSym2) and resultsGenericsOpenSym
+
   template isOkOr*[T, E](self: Result[T, E], body: untyped) =
     ## Evaluate `body` iff result has been assigned an error
     ## `body` is evaluated lazily.
@@ -1249,7 +1255,7 @@ else:
     case s.oResultPrivate
     of false:
       when E isnot void:
-        when resultsGenericsOpenSym:
+        when pushGenericsOpenSym:
           {.push experimental: "genericsOpenSym".}
         template error(): E {.used.} =
           s.eResultPrivate
@@ -1283,7 +1289,7 @@ else:
     case s.oResultPrivate
     of true:
       when T isnot void:
-        when resultsGenericsOpenSym:
+        when pushGenericsOpenSym:
           {.push experimental: "genericsOpenSym".}
         template value(): T {.used.} =
           s.vResultPrivate
@@ -1323,7 +1329,7 @@ else:
       s.vResultPrivate
     of false:
       when E isnot void:
-        when resultsGenericsOpenSym:
+        when pushGenericsOpenSym:
           {.push experimental: "genericsOpenSym".}
         template error(): E {.used.} =
           s.eResultPrivate
@@ -1342,7 +1348,7 @@ else:
       s.eResultPrivate
     of true:
       when T isnot void:
-        when resultsGenericsOpenSym:
+        when pushGenericsOpenSym:
           {.push experimental: "genericsOpenSym".}
         template value(): T {.used.} =
           s.vResultPrivate

@@ -1036,34 +1036,47 @@ when resultsGenericsOpenSymWorkaround:
           return true
       false
 
-  proc containsIdent(n: NimNode, what: string): bool =
-    if n.eqIdent(what):
+  proc containsIdent(n: NimNode, what: string, with: NimNode): bool =
+    if n == with:
+      false # Don't replace if the right symbol is already being used
+    elif n.eqIdent(what):
       true
     else:
       for child in n:
-        if containsIdent(child, what):
+        if containsIdent(child, what, with):
           return true
 
       false
 
   proc replace(n: NimNode, what: string, with: NimNode): NimNode =
-    if not containsIdent(n, what): # Avoid lots of node copies if not needed
+    if not containsIdent(n, what, with): # Fast path that avoids copies altogether
       return n
 
-    if n.eqIdent(what):
+    if n == with:
+      result = with
+    elif n.eqIdent(what):
+      when resultsGenericsOpenSymWorkaroundHint:
+        hint("Replaced conflicting external symbol " & what, n)
       result = with
     else:
       case n.kind
       of nnkCallKinds:
-        if n[0].containsHack():
+        if n[0].kind == nnkDotExpr:
+          result = copyNimNode(n)
+          for i in 0 ..< n.len:
+            result.add replace(n[i], what, with)
+        elif n[0].containsHack():
           # Don't replace inside nested expansion
           result = n
         elif n.len == 1 and n[0].eqIdent(what):
-          # No arguments - replace call symbol
-          result = copyNimNode(n)
-          result.add with
-          when resultsGenericsOpenSymWorkaroundHint:
-            hint("Replaced node with injected symbol " & what, n[0])
+          if n[0] == with:
+            result = n
+          else:
+            # No arguments - replace call symbol
+            result = copyNimNode(n)
+            result.add with
+            when resultsGenericsOpenSymWorkaroundHint:
+              hint("Replaced conflicting external symbol " & what, n[0])
         else:
           # `error(...)` - replace args but not function name
           result = copyNimNode(n)
@@ -1167,7 +1180,7 @@ when resultsGenericsOpenSymWorkaround:
         template value(): T {.used, gensym.} =
           s.vResultPrivate
 
-        replaceHack(body, "value", value)
+        replaceHack(body, "value", s.vResultPrivate)
       else:
         body
     of false:

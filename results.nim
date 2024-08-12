@@ -340,19 +340,37 @@ type
 
   Opt*[T] = Result[T, void]
 
-const resultsGenericBindingWorkaround* {.booldefine.} = true
-  ## Enable a workaround for the template injection problem in the issue
-  ## linked below where injected templates get bound differently depending
-  ## on whether we're in a generic context or not - this leads to surprising
-  ## errors where random symbols from outer scopes get bound to the name
-  ## instead of the intended value.
-  ## However, this ugly hack might introduce more damage than it's worth so
-  ## it can be disabled at compile-time - hopefully an upstream solution
-  ## can be found.
-  # TODO https://github.com/nim-lang/Nim/issues/22605
-  # TODO https://github.com/arnetheduck/nim-results/issues/34
-  # TODO https://github.com/nim-lang/Nim/issues/23386
-  # TODO https://github.com/nim-lang/Nim/issues/23385
+const
+  resultsGenericsOpenSym* {.booldefine.} = true
+    ## Enable the experimental `genericsOpenSym` feature or a workaround for the
+    ## template injection problem in the issue linked below where scoped symbol
+    ## resolution works differently for expanded bodies in templates depending on
+    ## whether we're in a generic context or not.
+    ##
+    ## This leads to surprising errors where symbols from outer scopes get bound
+    ## instead of the symbol created in the template scope which should be seen
+    ## as a better candidate.
+    ##
+    ## On Nim versions that do not support `genericsOpenSym`, a macro is used
+    ## instead to reassign symbol matches which may or may not work depending on
+    ## the complexity of the code.
+    # TODO https://github.com/nim-lang/Nim/issues/22605
+    # TODO https://github.com/arnetheduck/nim-results/issues/34
+    # TODO https://github.com/nim-lang/Nim/issues/23386
+    # TODO https://github.com/nim-lang/Nim/issues/23385
+    #
+    # Related PR:s (there's more probably, but this gives an overview)
+    # https://github.com/nim-lang/Nim/pull/23102
+    # https://github.com/nim-lang/Nim/pull/23572
+    # https://github.com/nim-lang/Nim/pull/23873
+    # https://github.com/nim-lang/Nim/pull/23892
+    # https://github.com/nim-lang/Nim/pull/23939
+
+  resultsGenericsOpenSymWorkaround* {.booldefine.} =
+    resultsGenericsOpenSym and not defined(nimHasGenericsOpenSym)
+    ## Prefer macro workaround to solve genericsOpenSym issue
+
+  pushGenericsOpenSym = defined(nnimHasGenericsOpenSym) and resultsGenericsOpenSym
 
 func raiseResultOk[T, E](self: Result[T, E]) {.noreturn, noinline.} =
   # noinline because raising should take as little space as possible at call
@@ -1000,7 +1018,7 @@ func get*[T, E](self: Result[T, E], otherwise: T): T {.inline.} =
   of true: self.vResultPrivate
   of false: otherwise
 
-when resultsGenericBindingWorkaround:
+when resultsGenericsOpenSymWorkaround:
   import macros
 
   proc containsHack(n: NimNode): bool =
@@ -1080,7 +1098,6 @@ when resultsGenericBindingWorkaround:
     # of injecting a template and likely doesn't cover all applicable cases
     result = replace(body, $what, with)
 
-when resultsGenericBindingWorkaround:
   template isOkOr*[T, E](self: Result[T, E], body: untyped) =
     ## Evaluate `body` iff result has been assigned an error
     ## `body` is evaluated lazily.
@@ -1232,7 +1249,9 @@ else:
     case s.oResultPrivate
     of false:
       when E isnot void:
-        template error(): E {.used, inject.} =
+        when resultsGenericsOpenSym:
+          {.push experimental: "genericsOpenSym".}
+        template error(): E {.used.} =
           s.eResultPrivate
 
       body
@@ -1264,7 +1283,9 @@ else:
     case s.oResultPrivate
     of true:
       when T isnot void:
-        template value(): T {.used, inject.} =
+        when resultsGenericsOpenSym:
+          {.push experimental: "genericsOpenSym".}
+        template value(): T {.used.} =
           s.vResultPrivate
 
       body
@@ -1302,7 +1323,9 @@ else:
       s.vResultPrivate
     of false:
       when E isnot void:
-        template error(): E {.used, inject.} =
+        when resultsGenericsOpenSym:
+          {.push experimental: "genericsOpenSym".}
+        template error(): E {.used.} =
           s.eResultPrivate
 
       def
@@ -1319,7 +1342,9 @@ else:
       s.eResultPrivate
     of true:
       when T isnot void:
-        template value(): T {.used, inject.} =
+        when resultsGenericsOpenSym:
+          {.push experimental: "genericsOpenSym".}
+        template value(): T {.used.} =
           s.vResultPrivate
 
       def

@@ -699,7 +699,7 @@ block:
   proc genericFunc(T: type): int =
     let rErr = Result[int, string].err("abc")
     rErr.valueOr:
-      when resultsGenericBindingWorkaround:
+      when resultsGenericsOpenSym:
         doAssert $error == $rErr.error()
       else:
         doAssert $error == $Breaking.error

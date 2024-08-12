@@ -1061,27 +1061,28 @@ when resultsGenericsOpenSymWorkaround:
     else:
       case n.kind
       of nnkCallKinds:
-        if n[0].kind == nnkDotExpr:
-          result = copyNimNode(n)
-          for i in 0 ..< n.len:
-            result.add replace(n[i], what, with)
-        elif n[0].containsHack():
+        if n[0].containsHack():
           # Don't replace inside nested expansion
           result = n
-        elif n.len == 1 and n[0].eqIdent(what):
-          if n[0] == with:
-            result = n
+        elif n[0].eqIdent(what):
+          if n.len == 1:
+            if n[0] == with:
+              result = n
+            else:
+              # No arguments - replace call symbol
+              result = copyNimNode(n)
+              result.add with
+              when resultsGenericsOpenSymWorkaroundHint:
+                hint("Replaced conflicting external symbol " & what, n[0])
           else:
-            # No arguments - replace call symbol
+            # `error(...)` - replace args but not function name
             result = copyNimNode(n)
-            result.add with
-            when resultsGenericsOpenSymWorkaroundHint:
-              hint("Replaced conflicting external symbol " & what, n[0])
+            result.add n[0]
+            for i in 1 ..< n.len:
+              result.add replace(n[i], what, with)
         else:
-          # `error(...)` - replace args but not function name
           result = copyNimNode(n)
-          result.add n[0]
-          for i in 1 ..< n.len:
+          for i in 0 ..< n.len:
             result.add replace(n[i], what, with)
       of nnkExprEqExpr:
         # "error = xxx" - function call with named parameters and other weird stuff

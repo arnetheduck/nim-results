@@ -347,13 +347,17 @@ const
     ## resolution works differently for expanded bodies in templates depending on
     ## whether we're in a generic context or not.
     ##
-    ## This leads to surprising errors where symbols from outer scopes get bound
-    ## instead of the symbol created in the template scope which should be seen
-    ## as a better candidate.
+    ## The issue leads to surprising errors where symbols from outer scopes get
+    ## bound instead of the symbol created in the template scope which should be
+    ## seen as a better candidate, breaking access to `error` in `valueOr` and
+    ## friends.
     ##
-    ## On Nim versions that do not support `genericsOpenSym`, a macro is used
+    ## In Nim versions that do not support `genericsOpenSym`, a macro is used
     ## instead to reassign symbol matches which may or may not work depending on
     ## the complexity of the code.
+    ##
+    ## Nim 2.0.8 was released with an incomplete fix but already declares
+    ## `nimHasGenericsOpenSym`.
     # TODO https://github.com/nim-lang/Nim/issues/22605
     # TODO https://github.com/arnetheduck/nim-results/issues/34
     # TODO https://github.com/nim-lang/Nim/issues/23386

@@ -8,16 +8,16 @@ block:
   func works(): R =
     R.ok(42)
   func works2(): R =
-    result.ok(42)
+    result.ok(43)
   func works3(): R =
-    ok(42)
+    ok(44)
 
   func fails(): R =
     R.err("dummy")
   func fails2(): R =
-    result.err("dummy")
+    result.err("dummy2")
   func fails3(): R =
-    err("dummy")
+    err("dummy3")
 
   let
     rOk = works()
@@ -99,9 +99,21 @@ block:
     doAssert value == rOk.value()
 
   doAssert rOk.valueOr(failFast()) == rOk.value()
-  let rErrV = rErr.valueOr:
-    error.len
-  doAssert rErrV == rErr.error.len()
+  block: # plain syntax: `error`
+    let rErrV = rErr.valueOr:
+      ord(error[0])
+    doAssert rErrV == ord(rErr.error[0])
+
+  block: # call syntax: `error()`
+    let rErrV = rErr.valueOr:
+      ord(error()[0])
+    doAssert rErrV == ord(rErr.error()[0])
+
+  block: # nested valueOr binds to the inner error
+    let rInnerV = rErr.valueOr:
+      rErr2.valueOr:
+        ord(error[^1])
+    doAssert rInnerV == ord(rErr2.error[^1])
 
   let rOkV = rOk.errorOr:
     $value
@@ -490,7 +502,6 @@ block: # Result[T, void] aka `Opt`
       $x
   )
   .get() == $oOk.get()
-
   oOk
   .map(
     proc(x: int) =
@@ -679,3 +690,19 @@ block:
     yy = x.value()
 
   doAssert yy == 1234
+
+block:
+  type Breaking = enum
+    error # Same name as injected template
+    value
+
+  proc genericFunc(T: type): int =
+    let rErr = Result[int, string].err("abc")
+    rErr.valueOr:
+      when resultsGenericsOpenSym:
+        doAssert $error == $rErr.error()
+      else:
+        doAssert $error == $Breaking.error
+      33
+
+  discard genericFunc(int)

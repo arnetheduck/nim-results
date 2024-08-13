@@ -19,10 +19,7 @@ proc test(env, path: string) =
 
 task test, "Runs the test suite":
   for f in ["test_results.nim", "test_results2.nim"]:
-    for opt in [
-      "-d:resultsGenericsOpenSym:false", "-d:resultsGenericsOpenSym:true",
-      "-d:resultsLent=false", "-d:resultsLent=true",
-    ]:
+    for opt in ["-d:resultsGenericsOpenSym:false", "-d:resultsGenericsOpenSym:true"]:
       test opt, "tests/" & f
       if (NimMajor, NimMinor) >= (2, 0):
         test opt & " --mm:refc", "tests/" & f

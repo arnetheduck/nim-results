@@ -378,11 +378,11 @@ const
   resultsGenericsOpenSymWorkaroundHint* {.booldefine.} = true
 
   resultsLent {.booldefine.} = (NimMajor, NimMinor, NimPatch) >= (2, 0, 8)
-    ## Enable return of `lent` types - this *mostly* works in Nim 1.6+ but there
-    ## have been edge cases reported as late as 1.6.14 - YMMV - conservatively,
-    ## `lent` is therefore enabled only with the latest Nim version at the time
-    ## of writing, where it could be verified to work with several large
-    ## applications
+    ## Enable return of `lent` types - this *mostly* works in Nim 1.6.18+ but
+    ## there have been edge cases reported as late as 1.6.14 - YMMV -
+    ## conservatively, `lent` is therefore enabled only with the latest Nim
+    ## version at the time of writing, where it could be verified to work with
+    ## several large applications.
 
 when resultsLent:
   template maybeLent(T: untyped): untyped = lent T

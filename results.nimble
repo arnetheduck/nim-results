@@ -21,9 +21,7 @@ task test, "Runs the test suite":
   for f in ["test_results.nim", "test_results2.nim"]:
     for opt in [
       "-d:resultsGenericsOpenSym:false", "-d:resultsGenericsOpenSym:true",
-      "-d:resultsGenericsOpenSymWorkaround=false",
-      "-d:resultsGenericsOpenSymWorkaround=true", "-d:resultsLent=false",
-      "-d:resultsLent=true",
+      "-d:resultsLent=false", "-d:resultsLent=true",
     ]:
       test opt, "tests/" & f
       if (NimMajor, NimMinor) >= (2, 0):

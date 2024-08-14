@@ -1,6 +1,6 @@
 # Package
 
-version = "0.4.0"
+version = "0.5.0"
 author = "Jacek Sieka"
 description = "Friendly, exception-free value-or-error returns, similar to Option[T]"
 license = "MIT"

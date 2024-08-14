@@ -502,6 +502,7 @@ block: # Result[T, void] aka `Opt`
       $x
   )
   .get() == $oOk.get()
+
   oOk
   .map(
     proc(x: int) =
@@ -591,6 +592,15 @@ block: # Result[T, void] aka `Opt`
 
     doAssert oOk.value() in oOk
     doAssert oOk.value() + 1 notin oOk
+
+block: # Nested `?`
+  proc inside(): Opt[int] =
+    ok(5)
+
+  proc kput(): Opt[int] =
+    ok(?inside())
+
+  doAssert kput() == Opt.some(5)
 
 block: # `cstring` dangling reference protection
   type CSRes = Result[void, cstring]

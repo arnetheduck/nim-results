@@ -502,6 +502,7 @@ block: # Result[T, void] aka `Opt`
       $x
   )
   .get() == $oOk.get()
+
   oOk
   .map(
     proc(x: int) =
@@ -593,10 +594,11 @@ block: # Result[T, void] aka `Opt`
     doAssert oOk.value() + 1 notin oOk
 
 block: # Nested `?`
-  proc inside: Opt[int] =
+  proc inside(): Opt[int] =
     ok(5)
-  proc kput: Opt[int] =
-    ok(? inside())
+
+  proc kput(): Opt[int] =
+    ok(?inside())
 
   doAssert kput() == Opt.some(5)
 

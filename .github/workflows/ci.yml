@@ -55,5 +55,5 @@ jobs:
           ARCHIVE="nph-linux_x64.tar.gz"
           curl -L "https://github.com/arnetheduck/nph/releases/download/${VERSION}/${ARCHIVE}" -o ${ARCHIVE}
           tar -xzf ${ARCHIVE}
-          ./nph
+          ./nph .
           git diff --exit-code

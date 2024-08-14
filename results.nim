@@ -385,9 +385,12 @@ const
     ## several large applications.
 
 when resultsLent:
-  template maybeLent(T: untyped): untyped = lent T
+  template maybeLent(T: untyped): untyped =
+    lent T
+
 else:
-  template maybeLent(T: untyped): untyped = T
+  template maybeLent(T: untyped): untyped =
+    T
 
 func raiseResultOk[T, E](self: Result[T, E]) {.noreturn, noinline.} =
   # noinline because raising should take as little space as possible at call

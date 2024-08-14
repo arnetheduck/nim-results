@@ -377,6 +377,21 @@ const
 
   resultsGenericsOpenSymWorkaroundHint* {.booldefine.} = true
 
+  resultsLent {.booldefine.} = (NimMajor, NimMinor, NimPatch) >= (2, 0, 8)
+    ## Enable return of `lent` types - this *mostly* works in Nim 1.6.18+ but
+    ## there have been edge cases reported as late as 1.6.14 - YMMV -
+    ## conservatively, `lent` is therefore enabled only with the latest Nim
+    ## version at the time of writing, where it could be verified to work with
+    ## several large applications.
+
+when resultsLent:
+  template maybeLent(T: untyped): untyped =
+    lent T
+
+else:
+  template maybeLent(T: untyped): untyped =
+    T
+
 func raiseResultOk[T, E](self: Result[T, E]) {.noreturn, noinline.} =
   # noinline because raising should take as little space as possible at call
   # site
@@ -840,7 +855,14 @@ func `==`*[T0, T1](lhs: Result[T0, void], rhs: Result[T1, void]): bool {.inline.
     of false:
       true
 
-func value*[T, E](self: Result[T, E]): T {.inline.} =
+func value*[E](self: Result[void, E]) {.inline.} =
+  ## Fetch value of result if set, or raise Defect
+  ## Exception bridge mode: raise given Exception instead
+  ## See also: Option.get
+  withAssertOk(self):
+    discard
+
+func value*[T: not void, E](self: Result[T, E]): maybeLent T {.inline.} =
   ## Fetch value of result if set, or raise Defect
   ## Exception bridge mode: raise given Exception instead
   ## See also: Option.get
@@ -882,7 +904,7 @@ template unsafeValue*[E](self: Result[void, E]) =
   ## See also: `unsafeError`
   assert self.oResultPrivate # Emulate field access defect in debug builds
 
-func tryValue*[T, E](self: Result[T, E]): T {.inline.} =
+func tryValue*[E](self: Result[void, E]) {.inline.} =
   ## Fetch value of result if set, or raise
   ## When E is an Exception, raise that exception - otherwise, raise a ResultError[E]
   mixin raiseResultError
@@ -890,10 +912,20 @@ func tryValue*[T, E](self: Result[T, E]): T {.inline.} =
   of false:
     self.raiseResultError()
   of true:
-    when T isnot void:
-      self.vResultPrivate
+    discard
 
-func expect*[T, E](self: Result[T, E], m: string): T =
+func tryValue*[T: not void, E](self: Result[T, E]): maybeLent T {.inline.} =
+  ## Fetch value of result if set, or raise
+  ## When E is an Exception, raise that exception - otherwise, raise a ResultError[E]
+  mixin raiseResultError
+  case self.oResultPrivate
+  of false:
+    self.raiseResultError()
+  of true:
+    # TODO https://github.com/nim-lang/Nim/issues/22216
+    result = self.vResultPrivate
+
+func expect*[E](self: Result[void, E], m: string) =
   ## Return value of Result, or raise a `Defect` with the given message - use
   ## this helper to extract the value when an error is not expected, for example
   ## because the program logic dictates that the operation should never fail
@@ -910,8 +942,27 @@ func expect*[T, E](self: Result[T, E], m: string): T =
     else:
       raiseResultDefect(m)
   of true:
-    when T isnot void:
-      self.vResultPrivate
+    discard
+
+func expect*[T: not void, E](self: Result[T, E], m: string): maybeLent T =
+  ## Return value of Result, or raise a `Defect` with the given message - use
+  ## this helper to extract the value when an error is not expected, for example
+  ## because the program logic dictates that the operation should never fail
+  ##
+  ## ```nim
+  ## let r = Result[int, int].ok(42)
+  ## # Put here a helpful comment why you think this won't fail
+  ## echo r.expect("r was just set to ok(42)")
+  ## ```
+  case self.oResultPrivate
+  of false:
+    when E isnot void:
+      raiseResultDefect(m, self.eResultPrivate)
+    else:
+      raiseResultDefect(m)
+  of true:
+    # TODO https://github.com/nim-lang/Nim/issues/22216
+    result = self.vResultPrivate
 
 func expect*[T: not void, E](self: var Result[T, E], m: string): var T =
   (
@@ -939,7 +990,7 @@ func `$`*[T, E](self: Result[T, E]): string =
     else:
       "err(" & $self.eResultPrivate & ")"
 
-func error*[T, E](self: Result[T, E]): E =
+func error*[T](self: Result[T, void]) =
   ## Fetch error of result if set, or raise Defect
   case self.oResultPrivate
   of true:
@@ -948,10 +999,21 @@ func error*[T, E](self: Result[T, E]): E =
     else:
       raiseResultDefect("Trying to access error when value is set")
   of false:
-    when E isnot void:
-      self.eResultPrivate
+    discard
 
-func tryError*[T, E](self: Result[T, E]): E {.inline.} =
+func error*[T; E: not void](self: Result[T, E]): maybeLent E =
+  ## Fetch error of result if set, or raise Defect
+  case self.oResultPrivate
+  of true:
+    when T isnot void:
+      raiseResultDefect("Trying to access error when value is set", self.vResultPrivate)
+    else:
+      raiseResultDefect("Trying to access error when value is set")
+  of false:
+    # TODO https://github.com/nim-lang/Nim/issues/22216
+    result = self.eResultPrivate
+
+func tryError*[T](self: Result[T, void]) {.inline.} =
   ## Fetch error of result if set, or raise
   ## Raises a ResultError[T]
   mixin raiseResultOk
@@ -959,8 +1021,18 @@ func tryError*[T, E](self: Result[T, E]): E {.inline.} =
   of true:
     self.raiseResultOk()
   of false:
-    when E isnot void:
-      self.eResultPrivate
+    discard
+
+func tryError*[T; E: not void](self: Result[T, E]): maybeLent E {.inline.} =
+  ## Fetch error of result if set, or raise
+  ## Raises a ResultError[T]
+  mixin raiseResultOk
+  case self.oResultPrivate
+  of true:
+    self.raiseResultOk()
+  of false:
+    # TODO https://github.com/nim-lang/Nim/issues/22216
+    result = self.eResultPrivate
 
 template unsafeError*[T; E: not void](self: Result[T, E]): E =
   ## Fetch error of result if set, undefined behavior if unset
@@ -1488,7 +1560,7 @@ template `?`*[T, E](self: Result[T, E]): auto =
 
 # Collection integration
 
-iterator values*[T, E](self: Result[T, E]): T =
+iterator values*[T, E](self: Result[T, E]): maybeLent T =
   ## Iterate over a Result as a 0/1-item collection, returning its value if set
   case self.oResultPrivate
   of true:
@@ -1496,7 +1568,7 @@ iterator values*[T, E](self: Result[T, E]): T =
   of false:
     discard
 
-iterator errors*[T, E](self: Result[T, E]): E =
+iterator errors*[T, E](self: Result[T, E]): maybeLent E =
   ## Iterate over a Result as a 0/1-item collection, returning its error if set
   case self.oResultPrivate
   of false:
@@ -1504,7 +1576,7 @@ iterator errors*[T, E](self: Result[T, E]): E =
   of true:
     discard
 
-iterator items*[T](self: Opt[T]): T =
+iterator items*[T](self: Opt[T]): maybeLent T =
   ## Iterate over an Opt as a 0/1-item collection, returning its value if set
   case self.oResultPrivate
   of true:

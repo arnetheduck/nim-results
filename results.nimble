@@ -1,13 +1,12 @@
 # Package
 
-version = "0.5.0"
+version = "0.5.1"
 author = "Jacek Sieka"
 description = "Friendly, exception-free value-or-error returns, similar to Option[T]"
 license = "MIT"
 skipDirs = @["benchmarks", "tests"]
 installFiles = @["results.nim"]
 # Dependencies
-
 requires "nim >= 1.2"
 
 proc test(env, path: string) =

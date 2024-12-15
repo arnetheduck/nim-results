@@ -19,9 +19,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        branch: ${{ fromJSON(format('[{0}]', inputs.branch || '"== 1.2.0",">= 1.2.x","== 1.4.2",">= 1.4.2","== 1.6.0",">= 1.6.x","== 2.0.0",">= 2.0.0","== 2.2.0",">= 2.2.0","#head"')) }}
+        branch: ${{ fromJSON(format('[{0}]', inputs.branch || '"== 1.2.0",">= 1.2.x","== 1.4.2",">= 1.4.2","== 1.6.0",">= 1.6.0","== 2.0.0",">= 2.0.0","== 2.2.0",">= 2.2.0","@#head"')) }}
 
-    name: 'nim-${{matrix.branch}}'
+    name: 'nim ${{matrix.branch}}'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

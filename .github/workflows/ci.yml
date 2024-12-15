@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       branch:
-        default: '"stable"'
+        default: '"== 2.2"'
 
 concurrency: # Cancel stale PR builds (but not push builds)
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
@@ -19,24 +19,23 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        branch: ${{ fromJSON(format('[{0}]', inputs.branch || '"1.2.0","1.2.x","1.4.2","1.4.x","1.6.0","1.6.x","2.0.0","2.0.x","stable","devel"')) }}
+        branch: ${{ fromJSON(format('[{0}]', inputs.branch || '"== 1.2.0",">= 1.2.x","== 1.4.2",">= 1.4.2","== 1.6.0",">= 1.6.0","== 2.0.0",">= 2.0.0","== 2.2.0",">= 2.2.0","@#head"')) }}
 
-    name: 'nim-${{matrix.branch}}'
+    name: 'nim ${{matrix.branch}}'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - uses: jiro4989/setup-nim-action@v1
+      - uses: nim-lang/setup-nimble-action@v1
         with:
-          nim-version: ${{ matrix.branch }}
+          nimble-version: 0.16.4
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run tests
         run: |
-          nim --version
-          env TEST_LANG="c" nimble test
-          env TEST_LANG="cpp" nimble test
+          env TEST_LANG="c" nimble test --requires="nim ${{matrix.branch}}"
+          env TEST_LANG="cpp" nimble test --requires="nim ${{matrix.branch}}"
 
 
   lint:

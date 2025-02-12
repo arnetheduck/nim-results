@@ -807,6 +807,26 @@ template catch*(body: typed): Result[type(body), ref CatchableError] =
   except CatchableError as eResultPrivate:
     R.err(eResultPrivate)
 
+template catchAsync*(body: typed): Result[type(body), ref CatchableError] =
+  ## Catch exceptions for `body` containing `await` and store them in the
+  ## Result, propagating cancellations.
+  ##
+  ## ```
+  ## let r = catchAsync: await someAsyncFuncThatMayRaise()
+  ## ```
+  type R = Result[type(body), ref CatchableError]
+
+  try:
+    when type(body) is void:
+      body
+      R.ok()
+    else:
+      R.ok(body)
+  except CancelledError as eCancelled:
+    raise eCancelled
+  except CatchableError as eResultPrivate:
+    R.err(eResultPrivate)
+
 template capture*[E: Exception](T: type, someExceptionExpr: ref E): Result[T, ref E] =
   ## Evaluate someExceptionExpr and put the exception into a result, making sure
   ## to capture a call stack at the capture site:

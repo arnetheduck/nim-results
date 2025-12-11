@@ -29,7 +29,7 @@ jobs:
 
       - uses: nim-lang/setup-nimble-action@v1
         with:
-          nimble-version: 22b07648f5d05d3f3cc105a6888ece51f338e29c
+          nimble-version: "22b07648f5d05d3f3cc105a6888ece51f338e29c"
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run tests

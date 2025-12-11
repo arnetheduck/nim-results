@@ -143,7 +143,7 @@ block:
   try:
     echo rErr[]
     doAssert false
-  except:
+  except Exception:
     discard
 
   when (NimMajor, NimMinor, NimPatch) >= (1, 6, 12):

@@ -384,39 +384,39 @@ block: # Result[void, E]
 
   # Mapping
   doAssert vOk
-  .map(
-    proc(): int =
-      42
-  )
-  .get() == 42
+    .map(
+      proc(): int =
+        42
+    )
+    .get() == 42
 
   vOk
-  .map(
-    proc() =
-      discard
-  )
-  .get()
+    .map(
+      proc() =
+        discard
+    )
+    .get()
 
   vOk
-  .mapErr(
-    proc(x: int): int =
-      10
-  )
-  .get()
+    .mapErr(
+      proc(x: int): int =
+        10
+    )
+    .get()
 
   vOk
-  .mapErr(
-    proc(x: int) =
-      discard
-  )
-  .get()
+    .mapErr(
+      proc(x: int) =
+        discard
+    )
+    .get()
 
   doAssert vErr
-  .mapErr(
-    proc(x: int): int =
-      10
-  )
-  .error() == 10
+    .mapErr(
+      proc(x: int): int =
+        10
+    )
+    .error() == 10
 
   # string conversion
   doAssert $vOk == "ok()"
@@ -497,38 +497,38 @@ block: # Result[T, void] aka `Opt`
 
   # Mapping
   doAssert oOk
-  .map(
-    proc(x: int): string =
-      $x
-  )
-  .get() == $oOk.get()
+    .map(
+      proc(x: int): string =
+        $x
+    )
+    .get() == $oOk.get()
 
   oOk
-  .map(
-    proc(x: int) =
-      discard
-  )
-  .get()
+    .map(
+      proc(x: int) =
+        discard
+    )
+    .get()
 
   doAssert oOk
-  .mapErr(
-    proc(): int =
-      10
-  )
-  .get() == oOk.get()
+    .mapErr(
+      proc(): int =
+        10
+    )
+    .get() == oOk.get()
   doAssert oOk
-  .mapErr(
-    proc() =
-      discard
-  )
-  .get() == oOk.get()
+    .mapErr(
+      proc() =
+        discard
+    )
+    .get() == oOk.get()
 
   doAssert oErr
-  .mapErr(
-    proc(): int =
-      10
-  )
-  .error() == 10
+    .mapErr(
+      proc(): int =
+        10
+    )
+    .error() == 10
 
   # string conversion
   doAssert $oOk == "ok(42)"
@@ -550,11 +550,11 @@ block: # Result[T, void] aka `Opt`
       Result[void, void].ok()
   ) == oOk
   doAssert oOk
-  .filter(
-    proc(x: int): auto =
-      Result[void, void].err()
-  )
-  .isErr()
+    .filter(
+      proc(x: int): auto =
+        Result[void, void].err()
+    )
+    .isErr()
   doAssert oErr.filter(
     proc(x: int): auto =
       Result[void, void].err()
@@ -565,11 +565,11 @@ block: # Result[T, void] aka `Opt`
       true
   ) == oOk
   doAssert oOk
-  .filter(
-    proc(x: int): bool =
-      false
-  )
-  .isErr()
+    .filter(
+      proc(x: int): bool =
+        false
+    )
+    .isErr()
   doAssert oErr.filter(
     proc(x: int): bool =
       true

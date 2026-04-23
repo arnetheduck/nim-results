@@ -403,29 +403,39 @@ func raiseResultOk[T, E](self: Result[T, E]) {.noreturn, noinline.} =
   when T is void:
     raise (ref ResultError[void])(msg: "Trying to access error with value")
   else:
-    raise (ref ResultError[T])(
-      msg: "Trying to access error with value", error: self.vResultPrivate
-    )
+    case self.oResultPrivate
+    of true:
+      raise (ref ResultError[T])(
+        msg: "Trying to access error with value", error: self.vResultPrivate
+      )
+    of false:
+      raise (ref ResultError[void])(msg: "Trying to access error with value")
 
 func raiseResultError[T, E](self: Result[T, E]) {.noreturn, noinline.} =
   # noinline because raising should take as little space as possible at call
   # site
   mixin toException
 
-  when E is ref Exception:
-    if self.eResultPrivate.isNil: # for example Result.default()!
-      raise (ref ResultError[void])(msg: "Trying to access value with err (nil)")
-    raise self.eResultPrivate
-  elif E is void:
+  when E is void:
     raise (ref ResultError[void])(msg: "Trying to access value with err")
-  elif compiles(toException(self.eResultPrivate)):
-    raise toException(self.eResultPrivate)
-  elif compiles($self.eResultPrivate):
-    raise (ref ResultError[E])(error: self.eResultPrivate, msg: $self.eResultPrivate)
   else:
-    raise (ref ResultError[E])(
-      msg: "Trying to access value with err", error: self.eResultPrivate
-    )
+    case self.oResultPrivate
+    of false:
+      when E is ref Exception:
+        if self.eResultPrivate.isNil: # for example Result.default()!
+          raise (ref ResultError[void])(msg: "Trying to access value with err (nil)")
+        raise self.eResultPrivate
+      elif compiles(toException(self.eResultPrivate)):
+        raise toException(self.eResultPrivate)
+      elif compiles($self.eResultPrivate):
+        raise
+          (ref ResultError[E])(error: self.eResultPrivate, msg: $self.eResultPrivate)
+      else:
+        raise (ref ResultError[E])(
+          msg: "Trying to access value with err", error: self.eResultPrivate
+        )
+    of true:
+      raise (ref ResultError[void])(msg: "Trying to access value with err")
 
 func raiseResultDefect(m: string, v: auto) {.noreturn, noinline.} =
   mixin `$`

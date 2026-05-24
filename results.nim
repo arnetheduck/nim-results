@@ -1638,3 +1638,10 @@ func contains*(self: Opt, v: auto): bool =
     self.vResultPrivate == v
   of false:
     false
+
+func toOpt*[T](v: Opt[T] | T): Opt[T] =
+  ## Converts union type of `T` or `Opt[T]` into `Opt[T]`.
+  when v is T:
+    Opt.some(v)
+  else:
+    v

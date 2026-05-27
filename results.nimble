@@ -21,7 +21,7 @@ task test, "Runs the test suite":
     for opt in ["-d:resultsGenericsOpenSym:false", "-d:resultsGenericsOpenSym:true"]:
       test opt, "tests/" & f
       if (NimMajor, NimMinor) >= (2, 0):
-        test opt & " --gc:refc", "tests/" & f
+        test opt & " --mm:refc", "tests/" & f
 
 task bench, "Run benchmark":
   test "-d:release", "benchmarks/benchmark.nim"

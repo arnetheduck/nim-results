@@ -47,5 +47,5 @@ jobs:
       - name: Check `nph` formatting
         uses: arnetheduck/nph-action@v1
         with:
-          version: latest
+          version: 0.6.2
           options: "."

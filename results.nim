@@ -705,12 +705,13 @@ func mapConvertErr*[T, E0](self: Result[T, E0], E1: type): Result[T, E1] {.inlin
   when E0 is E1:
     result = self
   else:
-    if self.oResultPrivate:
+    case self.oResultPrivate
+    of true:
       when T is void:
         result.ok()
       else:
         result.ok(self.vResultPrivate)
-    else:
+    of false:
       when E1 is void:
         result.err()
       else:
@@ -719,12 +720,13 @@ func mapConvertErr*[T, E0](self: Result[T, E0], E1: type): Result[T, E1] {.inlin
 func mapCastErr*[T, E0](self: Result[T, E0], E1: type): Result[T, E1] {.inline.} =
   ## Convert result value to A using a cast
   ## Would be nice with nicer syntax...
-  if self.oResultPrivate:
+  case self.oResultPrivate
+  of true:
     when T is void:
       result.ok()
     else:
       result.ok(self.vResultPrivate)
-  else:
+  of false:
     result.err(cast[E1](self.eResultPrivate))
 
 template `and`*[T0, E, T1](self: Result[T0, E], other: Result[T1, E]): Result[T1, E] =

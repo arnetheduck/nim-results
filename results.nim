@@ -448,7 +448,7 @@ template withAssertOk(self: Result, body: untyped): untyped =
   of true:
     body
 
-template ok*[T: not void, E](R: type Result[T, E], x: untyped): R =
+template ok*[T: not void, E](R: type Result[T, E], x: typed): R =
   ## Initialize a result with a success and value
   ## Example: `Result[int, string].ok(42)`
   R(oResultPrivate: true, vResultPrivate: x)
@@ -458,7 +458,7 @@ template ok*[E](R: type Result[void, E]): R =
   ## Example: `Result[void, string].ok()`
   R(oResultPrivate: true)
 
-template ok*[T: not void, E](self: var Result[T, E], x: untyped) =
+template ok*[T: not void, E](self: var Result[T, E], x: typed) =
   ## Set the result to success and update value
   ## Example: `result.ok(42)`
   self = ok(type self, x)
@@ -468,7 +468,7 @@ template ok*[E](self: var Result[void, E]) =
   ## Example: `result.ok()`
   self = (type self).ok()
 
-template err*[T; E: not void](R: type Result[T, E], x: untyped): R =
+template err*[T; E: not void](R: type Result[T, E], x: typed): R =
   ## Initialize the result to an error
   ## Example: `Result[int, string].err("uh-oh")`
   R(oResultPrivate: false, eResultPrivate: x)
@@ -484,7 +484,7 @@ template err*[T](R: type Result[T, void]): R =
   ## Example: `Result[int, void].err()`
   R(oResultPrivate: false)
 
-template err*[T; E: not void](self: var Result[T, E], x: untyped) =
+template err*[T; E: not void](self: var Result[T, E], x: typed) =
   ## Set the result as an error
   ## Example: `result.err("uh-oh")`
   self = err(type self, x)
@@ -498,13 +498,13 @@ template err*[T](self: var Result[T, void]) =
   ## Example: `result.err()`
   self = err(type self)
 
-template ok*(v: auto): auto =
+template ok*(v: typed): auto =
   ok(typeof(result), v)
 
 template ok*(): auto =
   ok(typeof(result))
 
-template err*(v: auto): auto =
+template err*(v: typed): auto =
   err(typeof(result), v)
 
 template err*(): auto =

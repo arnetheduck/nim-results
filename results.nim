@@ -833,34 +833,45 @@ template capture*[E: Exception](T: type, someExceptionExpr: ref E): Result[T, re
 func `==`*[T0: not void, E0: not void, T1: not void, E1: not void](
     lhs: Result[T0, E0], rhs: Result[T1, E1]
 ): bool {.inline.} =
-  if lhs.oResultPrivate != rhs.oResultPrivate:
-    false
-  else:
-    case lhs.oResultPrivate # and rhs.oResultPrivate implied
+  case lhs.oResultPrivate
+  of true:
+    case rhs.oResultPrivate
     of true:
       lhs.vResultPrivate == rhs.vResultPrivate
+    of false:
+      false
+  of false:
+    case rhs.oResultPrivate
+    of true:
+      false
     of false:
       lhs.eResultPrivate == rhs.eResultPrivate
 
 func `==`*[E0, E1](lhs: Result[void, E0], rhs: Result[void, E1]): bool {.inline.} =
-  if lhs.oResultPrivate != rhs.oResultPrivate:
-    false
-  else:
-    case lhs.oResultPrivate # and rhs.oResultPrivate implied
+  case lhs.oResultPrivate
+  of true:
+    case rhs.oResultPrivate
+    of true: true
+    of false: false
+  of false:
+    case rhs.oResultPrivate
     of true:
-      true
+      false
     of false:
       lhs.eResultPrivate == rhs.eResultPrivate
 
 func `==`*[T0, T1](lhs: Result[T0, void], rhs: Result[T1, void]): bool {.inline.} =
-  if lhs.oResultPrivate != rhs.oResultPrivate:
-    false
-  else:
-    case lhs.oResultPrivate # and rhs.oResultPrivate implied
+  case lhs.oResultPrivate
+  of true:
+    case rhs.oResultPrivate
     of true:
       lhs.vResultPrivate == rhs.vResultPrivate
     of false:
-      true
+      false
+  of false:
+    case rhs.oResultPrivate
+    of true: false
+    of false: true
 
 func value*[E](self: Result[void, E]) {.inline.} =
   ## Fetch value of result if set, or raise Defect

@@ -192,7 +192,7 @@ type
     ## Returning a `ref E` allows introducing dynamically typed error
     ## information, similar to exceptions.
     ##
-    ## # Other implemenations in nim
+    ## # Other implementations in nim
     ##
     ## There are other implementations in nim that you might prefer:
     ## * Either from nimfp: https://github.com/vegansk/nimfp/blob/master/src/fp/either.nim
@@ -278,7 +278,7 @@ type
     ##   the relative performance of the happy path will depend on the structure
     ##   of the code: how many exception handlers there are, how much unwinding
     ##   happens. `setjmp` works by taking a snapshot of the full CPU state and
-    ##   saving it to memory when enterting a try block (or an implict try
+    ##   saving it to memory when entering a try block (or an implicit try
     ##   block, such as is introduced with `defer` and similar constructs).
     ## * an efficient exception handling mechanism (like the C++ backend or
     ##   `nlvm`) will usually have a lower cost on the happy path because the

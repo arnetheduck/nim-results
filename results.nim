@@ -414,7 +414,7 @@ func raiseResultError[T, E](self: Result[T, E]) {.noreturn, noinline.} =
 
   when E is ref Exception:
     if self.eResultPrivate.isNil: # for example Result.default()!
-      raise (ref ResultError[void])(msg: "Trying to access value with err (nil)")
+      raise (ref ResultDefect)(msg: "Trying to access value with err (nil)")
     raise self.eResultPrivate
   elif E is void:
     raise (ref ResultError[void])(msg: "Trying to access value with err")

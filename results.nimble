@@ -22,6 +22,12 @@ task test, "Runs the test suite":
       test opt, "tests/" & f
       if (NimMajor, NimMinor) >= (2, 0):
         test opt & " --mm:refc", "tests/" & f
+  # strictCaseObjects test — Nim >= 2.0 only (the pragma exists on earlier
+  # versions but the flow-analysis diagnostics this test exercises are
+  # only stabilised on modern Nim).
+  if (NimMajor, NimMinor) >= (2, 0):
+    test "", "tests/test_strict_caseobjects.nim"
+    test "--mm:refc", "tests/test_strict_caseobjects.nim"
 
 task bench, "Run benchmark":
   test "-d:release", "benchmarks/benchmark.nim"

@@ -389,6 +389,9 @@ const
     ## ORC is not expected to work until 2.2.
     ## https://github.com/nim-lang/Nim/issues/23973
 
+  resultsDebugErrors {.booldefine.} = false
+    ## Print a source-prefixed line every time an error result is instantiated
+
 when resultsLent:
   template maybeLent(T: untyped): untyped =
     lent T
@@ -471,12 +474,38 @@ template ok*[E](self: var Result[void, E]) =
 template err*[T; E: not void](R: type Result[T, E], x: untyped): R =
   ## Initialize the result to an error
   ## Example: `Result[int, string].err("uh-oh")`
+  when resultsDebugErrors:
+    {.nosideeffect.}:
+      when compiles($x):
+        debugEcho instantiationInfo(-2).filename,
+          ":", instantiationInfo(-2).line, " ", $x
+        debugEcho instantiationInfo(-1).filename,
+          ":", instantiationInfo(-1).line, " ", $x
+      elif compiles(repr(x)):
+        debugEcho instantiationInfo(-2).filename,
+          ":", instantiationInfo(-2).line, " ", repr(x)
+        debugEcho instantiationInfo(-1).filename,
+          ":", instantiationInfo(-1).line, " ", repr(x)
+      else:
+        debugEcho instantiationInfo(-1).filename, ":", instantiationInfo(-1).line
+
   R(oResultPrivate: false, eResultPrivate: x)
 
 template err*[T](R: type Result[T, cstring], x: string): R =
   ## Initialize the result to an error
   ## Example: `Result[int, string].err("uh-oh")`
   const s = x # avoid dangling cstring pointers
+  when resultsDebugErrors:
+    {.nosideeffect.}:
+      when compiles($x):
+        debugEcho instantiationInfo(-1).filename,
+          ":", instantiationInfo(-1).line, " ", $x
+      elif compiles(repr(x)):
+        debugEcho instantiationInfo(-1).filename,
+          ":", instantiationInfo(-1).line, " ", repr(x)
+      else:
+        debugEcho instantiationInfo(-1).filename, ":", instantiationInfo(-1).line
+
   R(oResultPrivate: false, eResultPrivate: cstring(s))
 
 template err*[T](R: type Result[T, void]): R =
